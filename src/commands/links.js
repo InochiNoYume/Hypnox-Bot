@@ -1,5 +1,6 @@
-const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
+const { SlashCommandBuilder } = require('discord.js');
 const { getEnv } = require('../config/env');
+const { brandedEmbed } = require('../utils/embeds');
 
 function readUrl(key) {
   const value = getEnv(key);
@@ -27,12 +28,9 @@ module.exports = {
       ? links.map(([name, url]) => `**${name}:** [Abrir enlace](${url})`).join('\n')
       : 'No se encontraron enlaces oficiales configurados en el entorno del bot.';
 
-    const embed = new EmbedBuilder()
-      .setColor(Number.parseInt(process.env.BOT_COLOR || '000000', 16))
-      .setTitle('HYPNOX STUDIOS — ENLACES')
-      .setDescription(description)
-      .setFooter({ text: 'Hypnox Studios • Enlaces oficiales' })
-      .setTimestamp();
+    const embed = brandedEmbed('ENLACES OFICIALES', description, {
+      footerText: 'Hypnox Studios • Enlaces oficiales'
+    });
 
     return interaction.reply({ embeds: [embed] });
   },
