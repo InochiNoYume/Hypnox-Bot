@@ -12,14 +12,15 @@ async function registerSlashCommands(client) {
   const guilds = [
     ['official', getEnv('OFFICIAL_GUILD_ID')],
     ['staff', getEnv('STAFF_GUILD_ID')],
-    ['applications', getEnv('APPLICATIONS_GUILD_ID')]
-  ];
+    ['applications', getEnv('APPLICATIONS_GUILD_ID')],
+    ['dev', getEnv('DISCORD_DEV_GUILD_ID') || getEnv('DEV_GUILD_ID')]
+  ].filter(([, guildId]) => guildId);
 
   const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN);
 
   for (const [guildType, guildId] of guilds) {
     const body = commands
-      .filter((command) => (command.guilds || ['official', 'staff', 'applications']).includes(guildType))
+      .filter((command) => guildType === 'dev' || (command.guilds || ['official', 'staff', 'applications']).includes(guildType))
       .map((command) => command.data.toJSON());
 
     await rest.put(
