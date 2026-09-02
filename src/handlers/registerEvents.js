@@ -17,14 +17,16 @@ const TICKET_ACCESS = {
   soporte: ['OFFICIAL_ROLE_FOUNDER_ID','OFFICIAL_ROLE_DIRECTOR_ID','OFFICIAL_ROLE_ADMINISTRATOR_ID','OFFICIAL_ROLE_SRMOD_ID','OFFICIAL_ROLE_MOD_ID','OFFICIAL_ROLE_TMOD_ID','OFFICIAL_ROLE_HELPER_ID'],
   reporte: ['OFFICIAL_ROLE_FOUNDER_ID','OFFICIAL_ROLE_DIRECTOR_ID','OFFICIAL_ROLE_ADMINISTRATOR_ID','OFFICIAL_ROLE_SRMOD_ID','OFFICIAL_ROLE_MOD_ID','OFFICIAL_ROLE_TMOD_ID'],
   alianza: ['OFFICIAL_ROLE_FOUNDER_ID','OFFICIAL_ROLE_DIRECTOR_ID','OFFICIAL_ROLE_ADMINISTRATOR_ID','OFFICIAL_ROLE_SRMOD_ID','OFFICIAL_ROLE_MOD_ID','OFFICIAL_ROLE_TMOD_ID','OFFICIAL_ROLE_HELPER_ID'],
-  contacto: ['OFFICIAL_ROLE_FOUNDER_ID','OFFICIAL_ROLE_DIRECTOR_ID','OFFICIAL_ROLE_ADMINISTRATOR_ID']
+  contacto: ['OFFICIAL_ROLE_FOUNDER_ID','OFFICIAL_ROLE_DIRECTOR_ID','OFFICIAL_ROLE_ADMINISTRATOR_ID'],
+  bugs: ['OFFICIAL_ROLE_FOUNDER_ID','OFFICIAL_ROLE_DIRECTOR_ID','OFFICIAL_ROLE_ADMINISTRATOR_ID','OFFICIAL_ROLE_DEVELOPER_ID','OFFICIAL_ROLE_PRODUCER_ID']
 };
 
 const TICKET_FORMS = {
   soporte: { title: 'FORMULARIO — SOPORTE', questions: [['asunto','Asunto','¿En qué necesitas ayuda?',false],['problema','Problema','Explica brevemente el problema.',true],['detalles','Detalles','Añade toda la información relevante.',true],['evidencia','Evidencia','Enlace a imágenes, vídeos u otra evidencia. Es opcional.',false]] },
   reporte: { title: 'FORMULARIO — REPORTE', questions: [['usuario','Usuario reportado','Indica el usuario o usuarios involucrados.',false],['motivo','Motivo','Indica el motivo del reporte.',false],['descripcion','Descripción','Explica detalladamente lo ocurrido.',true],['evidencia','Evidencia','Enlace a imágenes, vídeos u otra evidencia. Es opcional.',false]] },
   alianza: { title: 'FORMULARIO — ALIANZA / PARTNER', questions: [['tipo','Tipo de solicitud','Alianza o Partner.',false],['servidor','Servidor / Comunidad','Nombre y descripción breve de tu comunidad.',true],['propuesta','Propuesta','¿Qué colaboración propones?',true],['miembros','Miembros','Cantidad aproximada de miembros activos.',false],['contacto','Contacto','Medio de contacto adicional, si corresponde.',false]] },
-  contacto: { title: 'FORMULARIO — CONTACTO', questions: [['asunto','Asunto','Indica el motivo de tu contacto.',false],['motivo','Motivo','Explica qué necesitas comunicar al equipo.',true],['detalles','Detalles','Añade cualquier información adicional.',true],['evidencia','Evidencia','Enlace a imágenes, vídeos u otra evidencia. Es opcional.',false]] }
+  contacto: { title: 'FORMULARIO — CONTACTO', questions: [['asunto','Asunto','Indica el motivo de tu contacto.',false],['motivo','Motivo','Explica qué necesitas comunicar al equipo.',true],['detalles','Detalles','Añade cualquier información adicional.',true],['evidencia','Evidencia','Enlace a imágenes, vídeos u otra evidencia. Es opcional.',false]] },
+  bugs: { title: 'FORMULARIO — BUGS / ERRORES', questions: [['asunto','Asunto','Indica brevemente el bug o error.',false],['descripcion','Descripción','Explica qué ocurre y qué esperabas que ocurriera.',true],['pasos','Pasos para reproducir','Indica los pasos necesarios para reproducir el problema.',true],['evidencia','Evidencia','Enlace a capturas, vídeos, logs u otra evidencia. Es opcional.',false]] }
 };
 
 function commandAccessAllowed(interaction, command, guildType) {
@@ -62,9 +64,10 @@ function collectTicketAnswers(interaction, type) {
 
 function buildTicketEmbed(type, user, answers) {
   const form = TICKET_FORMS[type];
-  const embed = brandedEmbed(`HYPNOX STUDIOS — ${type === 'alianza' ? 'ALIANZA / PARTNER' : type.toUpperCase()}`, 'Tu solicitud ha sido registrada correctamente. El equipo de Staff revisará la información y responderá en este canal.');
-  embed.addFields({name:'◆ SOLICITANTE',value:`<@${user.id}>`,inline:false}, ...form.questions.map(([id,label]) => ({name:`◆ ${label.toUpperCase()}`,value:answers[id] || 'No proporcionado.',inline:false}))); 
-  embed.addFields({name:'◆ ATENCIÓN',value:'Espera a un miembro del Staff. La atención puede demorar dependiendo de la disponibilidad del equipo. Si corresponde, puedes dejar evidencia adicional dentro de este ticket.',inline:false});
+  const title = type === 'alianza' ? 'ALIANZA / PARTNER' : type === 'bugs' ? 'BUGS / ERRORES' : type.toUpperCase();
+  const embed = brandedEmbed(`HYPNOX STUDIOS — ${title}`, 'Tu solicitud ha sido registrada correctamente. El equipo correspondiente revisará la información y responderá en este canal.');
+  embed.addFields({name:'◆ SOLICITANTE',value:`<@${user.id}>`,inline:false}, ...form.questions.map(([id,label]) => ({name:`◆ ${label.toUpperCase()}`,value:answers[id] || 'No proporcionado.',inline:false})));
+  embed.addFields({name:'◆ ATENCIÓN',value:type === 'bugs' ? 'El reporte será revisado por el equipo de desarrollo y producción. Incluye evidencia y pasos para reproducir el problema siempre que sea posible.' : 'Espera a un miembro del equipo correspondiente. La atención puede demorar dependiendo de la disponibilidad del equipo. Puedes dejar información adicional dentro de este ticket.',inline:false});
   embed.setFooter({text:'Hypnox Studios • Sistema de atención'});
   return embed;
 }
@@ -109,7 +112,7 @@ async function createTicketFromModal(interaction, type) {
 }
 
 function memberCanHandleTicket(interaction, ticket) {
-  const type = ticket.ticket_type === 'support' ? 'soporte' : ticket.ticket_type === 'report' ? 'reporte' : ticket.ticket_type === 'alliance_partner' ? 'alianza' : 'contacto';
+  const type = ticket.ticket_type === 'support' ? 'soporte' : ticket.ticket_type === 'report' ? 'reporte' : ticket.ticket_type === 'alliance_partner' ? 'alianza' : ticket.ticket_type === 'contact' ? 'contacto' : 'bugs';
   return ticketAccessRoleIds(interaction.guild, type).some((id) => interaction.member.roles.cache.has(id));
 }
 
@@ -121,16 +124,13 @@ async function hideOtherStaff(interaction, claimedUserId) {
       ReadMessageHistory: false
     });
   }
-
-  // La excepción de miembro se aplica después de los roles para que el Staff
-  // que reclamó conserve el acceso aunque pertenezca a uno de esos roles.
   await interaction.channel.permissionOverwrites.edit(claimedUserId, {
     ViewChannel: true,
     SendMessages: true,
     ReadMessageHistory: true
   });
-
-  const creatorId = await getTicketCreatorDiscordId(await getTicket(interaction.channelId));
+  const ticket = await getTicket(interaction.channelId);
+  const creatorId = await getTicketCreatorDiscordId(ticket);
   if (creatorId) {
     await interaction.channel.permissionOverwrites.edit(creatorId, {
       ViewChannel: true,
@@ -145,12 +145,10 @@ async function claimTicket(interaction) {
   if (!ticket) return interaction.reply({content:'Este canal no corresponde a un ticket abierto.',ephemeral:true});
   if (!memberCanHandleTicket(interaction, ticket)) return interaction.reply({content:'No tienes permiso para reclamar este ticket.',ephemeral:true});
   if (ticket.assigned_to_discord_user_id) return interaction.reply({content:`Este ticket ya fue reclamado por <@${ticket.assigned_to_discord_user_id}>.`,ephemeral:true});
-
   await updateTicket(ticket.id, {assigned_to_discord_user_id: interaction.user.id});
   await addTicketEvent(ticket.id, interaction.user.id, 'assigned', null, {});
   await hideOtherStaff(interaction, interaction.user.id);
   await writeLog({guild:interaction.guild,category:'ticket',action:'claim',actorId:interaction.user.id,channelId:interaction.channelId,message:`Ticket ${ticket.id} reclamado.`});
-
   await interaction.channel.send({content:`El ticket ha sido reclamado por <@${interaction.user.id}>.`});
   return interaction.reply({content:'Has reclamado este ticket. Ahora puedes responder al miembro.',ephemeral:true});
 }
@@ -159,18 +157,11 @@ async function closeTicket(interaction) {
   const ticket = await getTicket(interaction.channelId);
   if (!ticket) return interaction.reply({content:'Este canal no corresponde a un ticket abierto.',ephemeral:true});
   if (!memberCanHandleTicket(interaction, ticket)) return interaction.reply({content:'No tienes permiso para cerrar este ticket.',ephemeral:true});
-
   const channel = interaction.channel;
-  await updateTicket(ticket.id, {
-    status: 'closed',
-    closed_by_discord_user_id: interaction.user.id,
-    closed_at: new Date().toISOString()
-  });
+  await updateTicket(ticket.id, {status:'closed',closed_by_discord_user_id:interaction.user.id,closed_at:new Date().toISOString()});
   await addTicketEvent(ticket.id, interaction.user.id, 'closed', null, {assigned_to_discord_user_id: ticket.assigned_to_discord_user_id || null});
   await writeLog({guild:interaction.guild,category:'ticket',action:'close',actorId:interaction.user.id,channelId:channel.id,message:`Ticket ${ticket.id} cerrado.`});
-
   await interaction.reply({content:'Ticket cerrado. El canal será eliminado en unos segundos.',ephemeral:true});
-
   setTimeout(async () => {
     try {
       await channel.delete('Ticket cerrado');
