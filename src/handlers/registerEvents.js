@@ -1,8 +1,8 @@
-const { ChannelType, PermissionFlagsBits, ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder } = require('discord.js');
+const { ChannelType, PermissionFlagsBits, ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const { getGuildType } = require('../utils/guild');
 const { hasConfiguredRole } = require('../utils/permissions');
 const { getEnv } = require('../config/env');
-const { createTicket, addTicketEvent } = require('../services/tickets');
+const { createTicket, getTicket, updateTicket, addTicketEvent, getTicketCreatorDiscordId } = require('../services/tickets');
 const { writeLog } = require('../services/logs');
 const { ensureUser } = require('../services/moderation');
 const supabase = require('../database/supabase');
@@ -37,6 +37,12 @@ function ticketChannelName(type, username, userId) { const clean = (value) => St
 function buildTicketModal(type) { const form = TICKET_FORMS[type]; const modal = new ModalBuilder().setCustomId(`hypnox_ticket_modal:${type}`).setTitle(form.title); for (const [id,label,placeholder,paragraph] of form.questions) { const input = new TextInputBuilder().setCustomId(id).setLabel(label).setPlaceholder(placeholder).setStyle(paragraph ? TextInputStyle.Paragraph : TextInputStyle.Short).setRequired(!['evidencia','contacto'].includes(id)); modal.addComponents(new ActionRowBuilder().addComponents(input)); } return modal; }
 function collectTicketAnswers(interaction, type) { return Object.fromEntries(TICKET_FORMS[type].questions.map(([id]) => [id, interaction.fields.getTextInputValue(id) || 'No proporcionado.'])); }
 function buildTicketEmbed(type, user, answers) { const form = TICKET_FORMS[type]; const embed = brandedEmbed(`HYPNOX STUDIOS — ${type === 'alianza' ? 'ALIANZA / PARTNER' : type.toUpperCase()}`, 'Tu solicitud ha sido registrada correctamente. El equipo de Staff revisará la información y responderá en este canal.'); embed.addFields({name:'◆ SOLICITANTE',value:`<@${user.id}>`,inline:false}, ...form.questions.map(([id,label]) => ({name:`◆ ${label.toUpperCase()}`,value:answers[id] || 'No proporcionado.',inline:false}))); embed.addFields({name:'◆ ATENCIÓN',value:'Espera a un miembro del Staff. La atención puede demorar dependiendo de la disponibilidad del equipo. Si corresponde, puedes dejar evidencia adicional dentro de este ticket.',inline:false}); embed.setFooter({text:'Hypnox Studios • Sistema de atención'}); return embed; }
+function buildTicketButtons() {
+  return new ActionRowBuilder().addComponents(
+    new ButtonBuilder().setCustomId('hypnox_ticket_claim').setLabel('Reclamar').setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder().setCustomId('hypnox_ticket_close').setLabel('Cerrar').setStyle(ButtonStyle.Danger)
+  );
+}
 
 async function createTicketFromModal(interaction, type) {
   await interaction.deferReply({ ephemeral: true });
@@ -49,7 +55,7 @@ async function createTicketFromModal(interaction, type) {
     const permissionOverwrites = [
       {id:interaction.guild.roles.everyone.id,deny:[PermissionFlagsBits.ViewChannel]},
       {id:interaction.user.id,allow:[PermissionFlagsBits.ViewChannel,PermissionFlagsBits.SendMessages,PermissionFlagsBits.ReadMessageHistory]},
-      ...accessRoleIds.map((id) => ({id,allow:[PermissionFlagsBits.ViewChannel,PermissionFlagsBits.SendMessages,PermissionFlagsBits.ReadMessageHistory]}))
+      ...accessRoleIds.map((id) => ({id,allow:[PermissionFlagsBits.ViewChannel,PermissionFlagsBits.ReadMessageHistory],deny:[PermissionFlagsBits.SendMessages]}))
     ];
     const channel = await interaction.guild.channels.create({name:ticketChannelName(type,interaction.user.username,interaction.user.id),type:ChannelType.GuildText,parent:category.id,permissionOverwrites});
     try {
@@ -58,13 +64,59 @@ async function createTicketFromModal(interaction, type) {
       await writeLog({guild:interaction.guild,category:'ticket',action:'create',actorId:interaction.user.id,channelId:channel.id,message:JSON.stringify({type,answers})});
       const mentionRoleId = getEnv('OFFICIAL_TICKET_STAFF_MENTION_ROLE_ID');
       const mention = mentionRoleId && interaction.guild.roles.cache.has(mentionRoleId) ? `<@&${mentionRoleId}>` : '';
-      await channel.send({content:mention || undefined,allowedMentions:mention ? {roles:[mentionRoleId]} : undefined,embeds:[buildTicketEmbed(type,interaction.user,answers)]});
+      await channel.send({content:mention || undefined,allowedMentions:mention ? {roles:[mentionRoleId]} : undefined,embeds:[buildTicketEmbed(type,interaction.user,answers)],components:[buildTicketButtons()]});
       return interaction.editReply({content:`Tu ticket fue creado: <#${channel.id}>`});
     } catch (error) { await channel.delete().catch(() => {}); throw error; }
   } catch (error) {
     console.error('[HYPNOX] Ticket creation error:', error);
     return interaction.editReply({content:'No se pudo crear el ticket. El error fue registrado para revisión.'}).catch(() => {});
   }
+}
+
+function memberCanHandleTicket(interaction, ticket) {
+  const roleIds = ticketAccessRoleIds(interaction.guild, ticket.ticket_type === 'support' ? 'soporte' : ticket.ticket_type === 'report' ? 'reporte' : ticket.ticket_type === 'alliance_partner' ? 'alianza' : 'contacto');
+  return roleIds.some((id) => interaction.member.roles.cache.has(id));
+}
+
+async function claimTicket(interaction) {
+  const ticket = await getTicket(interaction.channelId);
+  if (!ticket) return interaction.reply({content:'Este canal no corresponde a un ticket abierto.',ephemeral:true});
+  if (!memberCanHandleTicket(interaction, ticket)) return interaction.reply({content:'No tienes permiso para reclamar este ticket.',ephemeral:true});
+  if (ticket.assigned_to_discord_user_id) return interaction.reply({content:`Este ticket ya fue reclamado por <@${ticket.assigned_to_discord_user_id}>.`,ephemeral:true});
+
+  await updateTicket(ticket.id, {assigned_to_discord_user_id: interaction.user.id});
+  await addTicketEvent(ticket.id, interaction.user.id, 'assigned', null, {});
+
+  await interaction.channel.permissionOverwrites.edit(interaction.user.id, {
+    ViewChannel: true,
+    SendMessages: true,
+    ReadMessageHistory: true
+  });
+  await interaction.channel.send({content:`El ticket ha sido reclamado por <@${interaction.user.id}>.`});
+  return interaction.reply({content:'Has reclamado este ticket. Ahora puedes responder al miembro.',ephemeral:true});
+}
+
+async function closeTicket(interaction) {
+  const ticket = await getTicket(interaction.channelId);
+  if (!ticket) return interaction.reply({content:'Este canal no corresponde a un ticket abierto.',ephemeral:true});
+  if (!memberCanHandleTicket(interaction, ticket)) return interaction.reply({content:'No tienes permiso para cerrar este ticket.',ephemeral:true});
+
+  await updateTicket(ticket.id, {
+    status: 'closed',
+    closed_by_discord_user_id: interaction.user.id,
+    closed_at: new Date().toISOString()
+  });
+  await addTicketEvent(ticket.id, interaction.user.id, 'closed', null, {assigned_to_discord_user_id: ticket.assigned_to_discord_user_id || null});
+  await writeLog({guild:interaction.guild,category:'ticket',action:'close',actorId:interaction.user.id,channelId:interaction.channelId,message:`Ticket ${ticket.id} cerrado.`});
+
+  const creatorId = await getTicketCreatorDiscordId(ticket);
+  await interaction.channel.permissionOverwrites.edit(interaction.guild.roles.everyone.id, {ViewChannel:false,SendMessages:false});
+  if (creatorId) await interaction.channel.permissionOverwrites.edit(creatorId, {ViewChannel:true,SendMessages:false,ReadMessageHistory:true});
+  for (const roleId of ticketAccessRoleIds(interaction.guild, ticket.ticket_type === 'support' ? 'soporte' : ticket.ticket_type === 'report' ? 'reporte' : ticket.ticket_type === 'alliance_partner' ? 'alianza' : 'contacto')) {
+    await interaction.channel.permissionOverwrites.edit(roleId, {ViewChannel:true,SendMessages:false,ReadMessageHistory:true});
+  }
+  await interaction.channel.send({content:`Este ticket ha sido cerrado por <@${interaction.user.id}>.`});
+  return interaction.reply({content:'Ticket cerrado correctamente.',ephemeral:true});
 }
 
 function registerEvents(client) {
@@ -78,6 +130,8 @@ function registerEvents(client) {
         if (error?.code === '23505') return interaction.reply({content:'Ya estás participando en este sorteo.',ephemeral:true}); if (error) throw error;
         return interaction.reply({content:'Tu participación fue registrada.',ephemeral:true});
       }
+      if (interaction.isButton() && interaction.customId === 'hypnox_ticket_claim') return claimTicket(interaction);
+      if (interaction.isButton() && interaction.customId === 'hypnox_ticket_close') return closeTicket(interaction);
       if (interaction.isStringSelectMenu() && interaction.customId === 'hypnox_ticket_type') {
         if (getGuildType(interaction.guildId) !== 'official') return interaction.reply({content:'El sistema de tickets solo está disponible en el servidor oficial.',ephemeral:true});
         const type = interaction.values[0]; if (!TICKET_FORMS[type]) return interaction.reply({content:'La categoría de ticket no es válida.',ephemeral:true}); return interaction.showModal(buildTicketModal(type));
