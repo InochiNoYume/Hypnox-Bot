@@ -31,5 +31,8 @@ module.exports = {
       .setTimestamp();
 
     return interaction.reply({ embeds: [embed] });
-  }
+  },
+
+  guilds: ['official'],
+  access: { roleEnvs: ['OFFICIAL_ROLE_MEMBER_ID'] }
 };
