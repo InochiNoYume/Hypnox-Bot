@@ -6,7 +6,7 @@ function configurePresence(client) {
   const normalizedStatus = validStatuses.has(status) ? status : 'dnd';
   const description = process.env.BOT_ACTIVITY || '';
 
-  client.once('ready', () => {
+  client.once('clientReady', () => {
     client.user.setPresence({
       status: normalizedStatus,
       activities: description
