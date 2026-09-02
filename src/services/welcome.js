@@ -1,5 +1,5 @@
 const { EmbedBuilder } = require('discord.js');
-const { getEnv } = require('../utils/env');
+const { getEnv } = require('../config/env');
 
 const BLACK = 0x000000;
 
