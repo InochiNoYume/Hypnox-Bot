@@ -3,38 +3,14 @@ const { canViewHelpCategory } = require('../utils/helpPermissions');
 const { getGuildType } = require('../utils/guild');
 
 const CATEGORIES = {
-  informacion: {
-    title: 'INFORMACIÓN',
-    description: 'Comandos generales de información y recursos del servidor.'
-  },
-  moderacion: {
-    title: 'MODERACIÓN',
-    description: 'Herramientas para administrar, sancionar y mantener el orden.'
-  },
-  tickets: {
-    title: 'TICKETS',
-    description: 'Sistema de soporte, reportes, alianzas/partners y contacto.'
-  },
-  anuncios: {
-    title: 'ANUNCIOS',
-    description: 'Publicación de anuncios, actividades, dinámicas, series y contenido oficial.'
-  },
-  eventos: {
-    title: 'EVENTOS',
-    description: 'Creación, edición, gestión y cierre de eventos.'
-  },
-  comunidad: {
-    title: 'COMUNIDAD',
-    description: 'Comandos disponibles para los miembros de la comunidad: usuario, servidor y créditos.'
-  },
-  premios: {
-    title: 'PREMIOS',
-    description: 'Gestión de sorteos, premios, ganadores y entregas.'
-  },
-  administracion: {
-    title: 'ADMINISTRACIÓN',
-    description: 'Configuración interna del bot y del servidor.'
-  }
+  informacion: { title: 'INFORMACIÓN', description: 'Comandos generales de información y recursos del servidor.' },
+  moderacion: { title: 'MODERACIÓN', description: 'Herramientas para administrar, sancionar y mantener el orden.' },
+  tickets: { title: 'TICKETS', description: 'Sistema de soporte, reportes, alianzas/partners y contacto.' },
+  anuncios: { title: 'ANUNCIOS', description: 'Publicación de anuncios, actividades, dinámicas, series y contenido oficial.' },
+  eventos: { title: 'EVENTOS', description: 'Creación, edición, gestión y cierre de eventos.' },
+  comunidad: { title: 'COMUNIDAD', description: 'Comandos para consultar información del usuario, del servidor y los créditos.' },
+  premios: { title: 'PREMIOS', description: 'Gestión de sorteos, premios, ganadores y entregas.' },
+  administracion: { title: 'ADMINISTRACIÓN', description: 'Configuración interna del bot y del servidor.' }
 };
 
 const COMMANDS = {
@@ -66,15 +42,8 @@ async function execute(interaction) {
   const guildType = getGuildType(interaction.guildId);
 
   if (subcommand === 'inicio') {
-    const visible = Object.entries(CATEGORIES)
-      .filter(([category]) => canViewHelpCategory(interaction.member, category))
-      .map(([category, info]) => `**${info.title}**\n${info.description}`)
-      .join('\n\n');
-
-    return interaction.reply({
-      embeds: [{ color: 0, title: 'HYPNOX STUDIOS — AYUDA', description: visible || 'No tienes categorías disponibles.', footer: { text: 'Consulta una categoría para ver sus comandos.' }, timestamp: new Date().toISOString() }],
-      ephemeral: true
-    });
+    const description = Object.values(CATEGORIES).map((category) => `**${category.title}**\n${category.description}`).join('\n\n');
+    return interaction.reply({ embeds: [{ color: 0, title: 'HYPNOX STUDIOS — AYUDA', description, footer: { text: 'Los subcomandos de /help requieren el rol correspondiente.' }, timestamp: new Date().toISOString() }], ephemeral: true });
   }
 
   if (!canViewHelpCategory(interaction.member, subcommand)) {
@@ -82,14 +51,8 @@ async function execute(interaction) {
   }
 
   const commands = COMMANDS[subcommand] || [];
-  const extra = subcommand === 'tickets' && guildType !== 'official'
-    ? '\n\nEste sistema solo está habilitado en el servidor oficial.'
-    : '';
-
-  return interaction.reply({
-    embeds: [{ color: 0, title: `HYPNOX STUDIOS — ${CATEGORIES[subcommand].title}`, description: `${CATEGORIES[subcommand].description}\n\n${commands.map((command) => `\`${command}\``).join('\n')}${extra}`, timestamp: new Date().toISOString() }],
-    ephemeral: true
-  });
+  const extra = subcommand === 'tickets' && guildType !== 'official' ? '\n\nEste sistema solo está habilitado en el servidor oficial.' : '';
+  return interaction.reply({ embeds: [{ color: 0, title: `HYPNOX STUDIOS — ${CATEGORIES[subcommand].title}`, description: `${CATEGORIES[subcommand].description}\n\n${commands.map((command) => `\`${command}\``).join('\n')}${extra}`, timestamp: new Date().toISOString() }], ephemeral: true });
 }
 
 module.exports = { data, execute };
