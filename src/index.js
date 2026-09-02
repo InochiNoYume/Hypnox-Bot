@@ -62,6 +62,9 @@ async function bootstrap() {
       { discord_guild_id: getEnv('STAFF_GUILD_ID'), guild_type: 'staff', name: 'Hypnox Studios Staff Team Discord' },
       { discord_guild_id: getEnv('APPLICATIONS_GUILD_ID'), guild_type: 'applications', name: 'Hypnox Studios Staff Applications Discord' }
     ];
+    const devGuildId = getEnv('DISCORD_DEV_GUILD_ID') || getEnv('DEV_GUILD_ID');
+    if (devGuildId) servers.push({ discord_guild_id: devGuildId, guild_type: 'dev', name: 'Hypnox Studios Development Server' });
+
     const { error } = await supabase.from('guilds').upsert(servers, { onConflict: 'discord_guild_id' });
     if (error) console.error('[HYPNOX] Error sincronizando servidores:', error.message);
     else console.log('[HYPNOX] Servidores sincronizados con Supabase.');
