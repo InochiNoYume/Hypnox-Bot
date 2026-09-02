@@ -18,6 +18,7 @@ const CATEGORY_PERMISSIONS = {
 };
 
 function canViewHelpCategory(member, category) {
+  if (getGuildType(member?.guild?.id) === 'dev') return true;
   const roles = CATEGORY_PERMISSIONS[category]?.[getGuildType(member?.guild?.id)] || [];
   return roles.some((roleEnv) => hasConfiguredRole(member, roleEnv));
 }
