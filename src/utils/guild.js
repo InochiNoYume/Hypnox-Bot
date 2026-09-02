@@ -1,0 +1,19 @@
+const config = require('../config/env');
+
+function getGuildType(guildId) {
+  if (guildId === config.guilds.official) return 'official';
+  if (guildId === config.guilds.staff) return 'staff';
+  if (guildId === config.guilds.applications) return 'applications';
+  return null;
+}
+
+function getGuildLogsChannelId(type) {
+  const map = {
+    official: config.logs.official,
+    staff: config.logs.staff,
+    applications: config.logs.applications
+  };
+  return map[type] || null;
+}
+
+module.exports = { getGuildType, getGuildLogsChannelId };
