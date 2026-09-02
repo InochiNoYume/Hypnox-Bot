@@ -23,12 +23,15 @@ async function registerSlashCommands(client) {
       .filter((command) => guildType === 'dev' || (command.guilds || ['official', 'staff', 'applications']).includes(guildType))
       .map((command) => command.data.toJSON());
 
-    await rest.put(
-      Routes.applicationGuildCommands(process.env.DISCORD_CLIENT_ID, guildId),
-      { body }
-    );
-
-    console.log(`[HYPNOX] Slash commands registrados en ${guildType}: ${body.length}`);
+    try {
+      await rest.put(
+        Routes.applicationGuildCommands(process.env.DISCORD_CLIENT_ID, guildId),
+        { body }
+      );
+      console.log(`[HYPNOX] Slash commands registrados en ${guildType}: ${body.length}`);
+    } catch (error) {
+      console.error(`[HYPNOX] No se pudieron registrar slash commands en ${guildType} (${guildId}): ${error.message}`);
+    }
   }
 }
 
@@ -51,11 +54,7 @@ async function bootstrap() {
   client.once('clientReady', async () => {
     console.log(`[HYPNOX] Conectado como ${client.user.tag}`);
 
-    try {
-      await registerSlashCommands(client);
-    } catch (error) {
-      console.error('[HYPNOX] Error registrando slash commands:', error);
-    }
+    await registerSlashCommands(client);
 
     const servers = [
       { discord_guild_id: getEnv('OFFICIAL_GUILD_ID'), guild_type: 'official', name: 'Hypnox Studios Official Discord' },
@@ -65,7 +64,8 @@ async function bootstrap() {
     const devGuildId = getEnv('DISCORD_DEV_GUILD_ID') || getEnv('DEV_GUILD_ID');
     if (devGuildId) servers.push({ discord_guild_id: devGuildId, guild_type: 'dev', name: 'Hypnox Studios Development Server' });
 
-    const { error } = await supabase.from('guilds').upsert(servers, { onConflict: 'discord_guild_id' });
+    const validServers = servers.filter((server) => server.discord_guild_id);
+    const { error } = await supabase.from('guilds').upsert(validServers, { onConflict: 'discord_guild_id' });
     if (error) console.error('[HYPNOX] Error sincronizando servidores:', error.message);
     else console.log('[HYPNOX] Servidores sincronizados con Supabase.');
   });
