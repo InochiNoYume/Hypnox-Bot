@@ -18,7 +18,8 @@ function getEnv(key, fallback = undefined) { return process.env[key] ?? fallback
 const guilds = {
   official: getEnv('OFFICIAL_GUILD_ID'),
   staff: getEnv('STAFF_GUILD_ID'),
-  applications: getEnv('APPLICATIONS_GUILD_ID')
+  applications: getEnv('APPLICATIONS_GUILD_ID'),
+  dev: getEnv('DISCORD_DEV_GUILD_ID') || getEnv('DEV_GUILD_ID')
 };
 
 const logs = {
