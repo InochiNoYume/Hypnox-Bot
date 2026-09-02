@@ -9,16 +9,19 @@ const data = new SlashCommandBuilder()
   .addUserOption((option) => option.setName('usuario2').setDescription('Segundo usuario aceptado').setRequired(false))
   .addUserOption((option) => option.setName('usuario3').setDescription('Tercer usuario aceptado').setRequired(false))
   .addUserOption((option) => option.setName('usuario4').setDescription('Cuarto usuario aceptado').setRequired(false))
-  .addUserOption((option) => option.setName('usuario5').setDescription('Quinto usuario aceptado').setRequired(false));
+  .addUserOption((option) => option.setName('usuario5').setDescription('Quinto usuario aceptado').setRequired(false))
+  .addUserOption((option) => option.setName('usuario6').setDescription('Sexto usuario aceptado').setRequired(false))
+  .addUserOption((option) => option.setName('usuario7').setDescription('Séptimo usuario aceptado').setRequired(false))
+  .addUserOption((option) => option.setName('usuario8').setDescription('Octavo usuario aceptado').setRequired(false))
+  .addUserOption((option) => option.setName('usuario9').setDescription('Noveno usuario aceptado').setRequired(false))
+  .addUserOption((option) => option.setName('usuario10').setDescription('Décimo usuario aceptado').setRequired(false));
 
 async function execute(interaction) {
   const channelId = getEnv('OFFICIAL_CHANNEL_APPLICATIONS_ID');
   const channel = channelId ? await interaction.guild.channels.fetch(channelId).catch(() => null) : null;
   if (!channel?.isTextBased()) return interaction.reply({ content: 'Configura OFFICIAL_CHANNEL_APPLICATIONS_ID antes de publicar resultados.', ephemeral: true });
 
-  const users = ['usuario1', 'usuario2', 'usuario3', 'usuario4', 'usuario5']
-    .map((name) => interaction.options.getUser(name))
-    .filter(Boolean);
+  const users = Array.from({ length: 10 }, (_, index) => interaction.options.getUser(`usuario${index + 1}`)).filter(Boolean);
   const mentions = users.map((user) => `<@${user.id}>`).join(', ');
 
   await channel.send({ embeds: [{ color: 0, title: 'HYPNOX STUDIOS — RESULTADOS DE POSTULACIÓN', description: `Los siguientes usuarios han sido aceptados para formar parte del Staff:\n\n${mentions}`, timestamp: new Date().toISOString() }] });
