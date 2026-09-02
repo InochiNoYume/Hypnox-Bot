@@ -1,20 +1,61 @@
 require('dotenv').config();
 
-const { Client, GatewayIntentBits, Collection } = require('discord.js');
+const { Client, GatewayIntentBits, Collection, REST, Routes } = require('discord.js');
 const { validateEnv, getEnv } = require('./config/env');
 const supabase = require('./database/supabase');
 const loadCommands = require('./handlers/loadCommands');
 const registerEvents = require('./handlers/registerEvents');
+const registerPrefix = require('./handlers/registerPrefix');
+
+async function registerSlashCommands(client) {
+  const commands = [...client.commands.values()];
+  const guilds = [
+    ['official', getEnv('OFFICIAL_GUILD_ID')],
+    ['staff', getEnv('STAFF_GUILD_ID')],
+    ['applications', getEnv('APPLICATIONS_GUILD_ID')]
+  ];
+
+  const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN);
+
+  for (const [guildType, guildId] of guilds) {
+    const body = commands
+      .filter((command) => (command.guilds || ['official', 'staff', 'applications']).includes(guildType))
+      .map((command) => command.data.toJSON());
+
+    await rest.put(
+      Routes.applicationGuildCommands(process.env.DISCORD_CLIENT_ID, guildId),
+      { body }
+    );
+
+    console.log(`[HYPNOX] Slash commands registrados en ${guildType}: ${body.length}`);
+  }
+}
 
 async function bootstrap() {
   validateEnv();
-  const client = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMembers] });
+  const client = new Client({
+    intents: [
+      GatewayIntentBits.Guilds,
+      GatewayIntentBits.GuildMembers,
+      GatewayIntentBits.GuildMessages,
+      GatewayIntentBits.MessageContent
+    ]
+  });
+
   client.commands = new Collection();
   loadCommands(client);
   registerEvents(client);
+  registerPrefix(client);
 
   client.once('ready', async () => {
     console.log(`[HYPNOX] Conectado como ${client.user.tag}`);
+
+    try {
+      await registerSlashCommands(client);
+    } catch (error) {
+      console.error('[HYPNOX] Error registrando slash commands:', error);
+    }
+
     const servers = [
       { discord_guild_id: getEnv('OFFICIAL_GUILD_ID'), guild_type: 'official', name: 'Hypnox Studios Official Discord' },
       { discord_guild_id: getEnv('STAFF_GUILD_ID'), guild_type: 'staff', name: 'Hypnox Studios Staff Team Discord' },
