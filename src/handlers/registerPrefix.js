@@ -123,6 +123,7 @@ function createPrefixInteraction(message, command, commandName, args) {
     member: message.member,
     user: message.author,
     channel: message.channel,
+    message,
     options: createPrefixOptions(message, command, subcommand, optionArgs),
     get replied() { return state.replied; },
     get deferred() { return state.deferred; },
