@@ -26,30 +26,42 @@ function createPrefixOptions(message, command, subcommand, args) {
   const optionValues = {};
   let positionalIndex = 0;
 
-  for (const definition of definitions) {
+  for (let index = 0; index < definitions.length; index += 1) {
+    const definition = definitions[index];
     const type = definition.type;
+
     if (type === 6) {
       const ids = extractUserIds(args.join(' '));
       optionValues[definition.name] = ids[positionalIndex] || null;
       positionalIndex += 1;
       continue;
     }
+
     if (type === 7) {
       optionValues[definition.name] = extractChannelId(args.join(' '));
       continue;
     }
+
     if (type === 8) {
       optionValues[definition.name] = extractRoleId(args.join(' '));
       continue;
     }
-    const value = args[positionalIndex];
+
+    const isLastDefinition = index === definitions.length - 1;
+    const value = isLastDefinition && type === 3
+      ? args.slice(positionalIndex).join(' ')
+      : args[positionalIndex];
+
     if (type === 4 || type === 10) {
       const parsed = Number(value);
       optionValues[definition.name] = Number.isFinite(parsed) ? parsed : null;
+    } else if (type === 5) {
+      optionValues[definition.name] = value == null ? null : ['true', 'sí', 'si', '1', 'yes'].includes(String(value).toLowerCase());
     } else {
       optionValues[definition.name] = value ?? null;
     }
-    positionalIndex += 1;
+
+    positionalIndex += isLastDefinition && type === 3 ? Math.max(args.length - positionalIndex, 1) : 1;
   }
 
   const getRaw = (name) => optionValues[name] ?? null;
@@ -72,10 +84,7 @@ function createPrefixOptions(message, command, subcommand, args) {
       const id = getRaw(name);
       return id ? message.guild.members.cache.get(id)?.user || { id } : null;
     },
-    getUsers: (name) => {
-      const ids = extractUserIds(args.join(' '));
-      return ids.map((id) => message.guild.members.cache.get(id)?.user || { id });
-    },
+    getUsers: () => extractUserIds(args.join(' ')).map((id) => message.guild.members.cache.get(id)?.user || { id }),
     getChannel: (name) => {
       const id = getRaw(name);
       return id ? message.guild.channels.cache.get(id) || { id } : null;
@@ -101,6 +110,12 @@ function createPrefixInteraction(message, command, commandName, args) {
     : null;
   const optionArgs = subcommand ? args.slice(1) : args;
 
+  const state = { replied: false, deferred: false };
+  const reply = async (payload) => {
+    state.replied = true;
+    return message.reply(payload);
+  };
+
   return {
     commandName,
     guildId: guild.id,
@@ -109,16 +124,17 @@ function createPrefixInteraction(message, command, commandName, args) {
     user: message.author,
     channel: message.channel,
     options: createPrefixOptions(message, command, subcommand, optionArgs),
-    replied: false,
-    deferred: false,
-    reply: async (payload) => message.reply(payload),
-    followUp: async (payload) => message.reply(payload),
-    deferReply: async () => {},
-    editReply: async (payload) => message.reply(payload)
+    get replied() { return state.replied; },
+    get deferred() { return state.deferred; },
+    reply,
+    followUp: reply,
+    deferReply: async () => { state.deferred = true; },
+    editReply: reply
   };
 }
 
-function canUseCommand(interaction, command) {
+function canUseCommand(interaction, command, guildType) {
+  if (guildType === 'dev') return true;
   if (!command.access?.roleEnvs?.length) return true;
   return command.access.roleEnvs.some((roleEnv) => hasConfiguredRole(interaction.member, roleEnv));
 }
@@ -136,11 +152,11 @@ async function handlePrefixMessage(client, message) {
   if (!command) return;
 
   const guildType = getGuildType(message.guild.id);
-  if (!guildType || !(command.guilds || ['official', 'staff', 'applications']).includes(guildType)) {
+  if (!guildType || (guildType !== 'dev' && !(command.guilds || ['official', 'staff', 'applications']).includes(guildType))) {
     return message.reply('Este comando no está disponible en este servidor.');
   }
 
-  if (!canUseCommand({ member: message.member }, command)) {
+  if (!canUseCommand({ member: message.member }, command, guildType)) {
     return message.reply('No tienes el rol necesario para usar este comando.');
   }
 
