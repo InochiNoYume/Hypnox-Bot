@@ -9,9 +9,7 @@ const ADMIN_ROLES = {
 };
 
 const CHANNELS = {
-  staff: {
-    reglamento: 'STAFF_CHANNEL_INTERNAL_RULES_ID'
-  },
+  staff: { reglamento: 'STAFF_CHANNEL_INTERNAL_RULES_ID' },
   applications: {
     requisitos: 'APPLICATIONS_CHANNEL_REQUIREMENTS_ID',
     informacion: 'APPLICATIONS_CHANNEL_INFORMATION_ID',
@@ -40,10 +38,7 @@ async function getConfiguredChannel(interaction, key) {
 }
 
 function accessDenied() {
-  const guildType = getGuildType();
-  return guildType === 'staff'
-    ? 'Solo Founder, Director y Administrative Assistant pueden utilizar este comando.'
-    : 'Solo Founder, Director y Administrator pueden utilizar este comando.';
+  return 'No tienes el rol administrativo necesario para utilizar este comando.';
 }
 
 function missingChannel(envKey) {
