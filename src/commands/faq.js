@@ -1,0 +1,40 @@
+const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
+const { getEnv } = require('../config/env');
+
+module.exports = {
+  data: new SlashCommandBuilder()
+    .setName('faq')
+    .setDescription('Publica las preguntas frecuentes del Discord oficial.'),
+
+  async execute(interaction) {
+    const roleId = getEnv('OFFICIAL_ROLE_MEMBER_ID');
+    if (!interaction.member?.roles?.cache?.has(roleId)) return interaction.reply({ content: 'No tienes permisos para publicar las preguntas frecuentes.', ephemeral: true });
+    const channelId = getEnv('OFFICIAL_CHANNEL_FAQ_ID');
+    const channel = channelId ? await interaction.guild.channels.fetch(channelId).catch(() => null) : null;
+    if (!channel?.isTextBased()) return interaction.reply({ content: 'Configura OFFICIAL_CHANNEL_FAQ_ID en el entorno del bot.', ephemeral: true });
+
+    const embed = new EmbedBuilder()
+      .setColor(0x000000)
+      .setTitle('HYPNOX STUDIOS — PREGUNTAS FRECUENTES')
+      .setDescription('╭━━━━━━━━━━━━━━━━━━━━━━╮\n          **CENTRO DE INFORMACIÓN**\n╰━━━━━━━━━━━━━━━━━━━━━━╯\n\nAquí encontrarás respuestas a las consultas más habituales sobre la comunidad, nuestras actividades y los sistemas de Hypnox Studios.')
+      .addFields(
+        { name: '『01』 ¿Qué es Hypnox Studios?', value: 'Es una comunidad y estudio enfocado en Minecraft, dedicado a crear series, eventos, actividades y proyectos para la comunidad.' },
+        { name: '『02』 ¿Cómo puedo participar en una serie?', value: 'Revisa los anuncios y canales de series. Cuando exista una convocatoria de participación, allí se indicarán los requisitos y la forma de inscripción.' },
+        { name: '『03』 ¿Cómo puedo participar en un evento?', value: 'Consulta el canal de eventos y sigue las instrucciones publicadas en cada convocatoria.' },
+        { name: '『04』 ¿Cómo puedo postular al Staff?', value: 'Cuando las postulaciones estén abiertas, el servidor oficial publicará el anuncio correspondiente con el acceso al Discord de Staff Applications.' },
+        { name: '『05』 ¿Cómo reporto a un usuario o situación?', value: 'Utiliza el sistema de tickets y selecciona la categoría **Reporte**. Proporciona información clara y, cuando corresponda, pruebas que permitan revisar el caso.' },
+        { name: '『06』 ¿Cómo solicito una alianza?', value: 'Abre un ticket mediante la categoría **Alianza / Partner** y proporciona la información solicitada.' },
+        { name: '『07』 ¿Cómo contacto directamente con Hypnox Studios?', value: 'Utiliza la categoría **Contacto** del sistema de tickets para comunicarte con el equipo autorizado.' },
+        { name: '『08』 ¿Dónde encuentro las redes oficiales?', value: 'Consulta el canal de redes y enlaces para acceder únicamente a los medios oficiales publicados por Hypnox Studios.' },
+        { name: '『09』 ¿Dónde puedo hacer una sugerencia?', value: 'Utiliza el canal destinado a sugerencias y explica de forma concreta qué propones y cómo podría mejorar la comunidad.' },
+        { name: '『10』 ¿Qué hago si necesito ayuda?', value: 'Consulta primero esta sección y los canales de información. Si no encuentras una respuesta, abre un ticket de **Soporte**.' }
+      )
+      .setFooter({ text: 'Hypnox Studios • Preguntas frecuentes' })
+      .setTimestamp();
+
+    await channel.send({ embeds: [embed] });
+    return interaction.reply({ content: `Preguntas frecuentes publicadas en <#${channel.id}>.`, ephemeral: true });
+  },
+
+  guilds: ['official']
+};
