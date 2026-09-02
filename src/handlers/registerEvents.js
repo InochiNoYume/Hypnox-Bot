@@ -32,11 +32,43 @@ function commandAccessAllowed(interaction, command, guildType) {
   if (!command.access?.roleEnvs?.length) return true;
   return command.access.roleEnvs.some((roleEnv) => hasConfiguredRole(interaction.member, roleEnv));
 }
-function ticketAccessRoleIds(guild, type) { return (TICKET_ACCESS[type] || []).map((env) => getEnv(env)).filter((id) => id && guild.roles.cache.has(id)); }
-function ticketChannelName(type, username, userId) { const clean = (value) => String(value).replace(/[^a-z0-9-]/gi, '-').replace(/-+/g, '-').replace(/^-|-$/g, '').toLowerCase(); return `${clean(type) || 'ticket'}-${clean(username) || userId}`.slice(0, 100); }
-function buildTicketModal(type) { const form = TICKET_FORMS[type]; const modal = new ModalBuilder().setCustomId(`hypnox_ticket_modal:${type}`).setTitle(form.title); for (const [id,label,placeholder,paragraph] of form.questions) { const input = new TextInputBuilder().setCustomId(id).setLabel(label).setPlaceholder(placeholder).setStyle(paragraph ? TextInputStyle.Paragraph : TextInputStyle.Short).setRequired(!['evidencia','contacto'].includes(id)); modal.addComponents(new ActionRowBuilder().addComponents(input)); } return modal; }
-function collectTicketAnswers(interaction, type) { return Object.fromEntries(TICKET_FORMS[type].questions.map(([id]) => [id, interaction.fields.getTextInputValue(id) || 'No proporcionado.'])); }
-function buildTicketEmbed(type, user, answers) { const form = TICKET_FORMS[type]; const embed = brandedEmbed(`HYPNOX STUDIOS — ${type === 'alianza' ? 'ALIANZA / PARTNER' : type.toUpperCase()}`, 'Tu solicitud ha sido registrada correctamente. El equipo de Staff revisará la información y responderá en este canal.'); embed.addFields({name:'◆ SOLICITANTE',value:`<@${user.id}>`,inline:false}, ...form.questions.map(([id,label]) => ({name:`◆ ${label.toUpperCase()}`,value:answers[id] || 'No proporcionado.',inline:false}))); embed.addFields({name:'◆ ATENCIÓN',value:'Espera a un miembro del Staff. La atención puede demorar dependiendo de la disponibilidad del equipo. Si corresponde, puedes dejar evidencia adicional dentro de este ticket.',inline:false}); embed.setFooter({text:'Hypnox Studios • Sistema de atención'}); return embed; }
+
+function ticketAccessRoleIds(guild, type) {
+  return (TICKET_ACCESS[type] || []).map((env) => getEnv(env)).filter((id) => id && guild.roles.cache.has(id));
+}
+
+function allConfiguredStaffRoleIds(guild) {
+  return STAFF_ROLE_ENVS.map((env) => getEnv(env)).filter((id) => id && guild.roles.cache.has(id));
+}
+
+function ticketChannelName(type, username, userId) {
+  const clean = (value) => String(value).replace(/[^a-z0-9-]/gi, '-').replace(/-+/g, '-').replace(/^-|-$/g, '').toLowerCase();
+  return `${clean(type) || 'ticket'}-${clean(username) || userId}`.slice(0, 100);
+}
+
+function buildTicketModal(type) {
+  const form = TICKET_FORMS[type];
+  const modal = new ModalBuilder().setCustomId(`hypnox_ticket_modal:${type}`).setTitle(form.title);
+  for (const [id, label, placeholder, paragraph] of form.questions) {
+    const input = new TextInputBuilder().setCustomId(id).setLabel(label).setPlaceholder(placeholder).setStyle(paragraph ? TextInputStyle.Paragraph : TextInputStyle.Short).setRequired(!['evidencia','contacto'].includes(id));
+    modal.addComponents(new ActionRowBuilder().addComponents(input));
+  }
+  return modal;
+}
+
+function collectTicketAnswers(interaction, type) {
+  return Object.fromEntries(TICKET_FORMS[type].questions.map(([id]) => [id, interaction.fields.getTextInputValue(id) || 'No proporcionado.']));
+}
+
+function buildTicketEmbed(type, user, answers) {
+  const form = TICKET_FORMS[type];
+  const embed = brandedEmbed(`HYPNOX STUDIOS — ${type === 'alianza' ? 'ALIANZA / PARTNER' : type.toUpperCase()}`, 'Tu solicitud ha sido registrada correctamente. El equipo de Staff revisará la información y responderá en este canal.');
+  embed.addFields({name:'◆ SOLICITANTE',value:`<@${user.id}>`,inline:false}, ...form.questions.map(([id,label]) => ({name:`◆ ${label.toUpperCase()}`,value:answers[id] || 'No proporcionado.',inline:false}))); 
+  embed.addFields({name:'◆ ATENCIÓN',value:'Espera a un miembro del Staff. La atención puede demorar dependiendo de la disponibilidad del equipo. Si corresponde, puedes dejar evidencia adicional dentro de este ticket.',inline:false});
+  embed.setFooter({text:'Hypnox Studios • Sistema de atención'});
+  return embed;
+}
+
 function buildTicketButtons() {
   return new ActionRowBuilder().addComponents(
     new ButtonBuilder().setCustomId('hypnox_ticket_claim').setLabel('Reclamar').setStyle(ButtonStyle.Secondary),
@@ -66,7 +98,10 @@ async function createTicketFromModal(interaction, type) {
       const mention = mentionRoleId && interaction.guild.roles.cache.has(mentionRoleId) ? `<@&${mentionRoleId}>` : '';
       await channel.send({content:mention || undefined,allowedMentions:mention ? {roles:[mentionRoleId]} : undefined,embeds:[buildTicketEmbed(type,interaction.user,answers)],components:[buildTicketButtons()]});
       return interaction.editReply({content:`Tu ticket fue creado: <#${channel.id}>`});
-    } catch (error) { await channel.delete().catch(() => {}); throw error; }
+    } catch (error) {
+      await channel.delete().catch(() => {});
+      throw error;
+    }
   } catch (error) {
     console.error('[HYPNOX] Ticket creation error:', error);
     return interaction.editReply({content:'No se pudo crear el ticket. El error fue registrado para revisión.'}).catch(() => {});
@@ -74,8 +109,35 @@ async function createTicketFromModal(interaction, type) {
 }
 
 function memberCanHandleTicket(interaction, ticket) {
-  const roleIds = ticketAccessRoleIds(interaction.guild, ticket.ticket_type === 'support' ? 'soporte' : ticket.ticket_type === 'report' ? 'reporte' : ticket.ticket_type === 'alliance_partner' ? 'alianza' : 'contacto');
-  return roleIds.some((id) => interaction.member.roles.cache.has(id));
+  const type = ticket.ticket_type === 'support' ? 'soporte' : ticket.ticket_type === 'report' ? 'reporte' : ticket.ticket_type === 'alliance_partner' ? 'alianza' : 'contacto';
+  return ticketAccessRoleIds(interaction.guild, type).some((id) => interaction.member.roles.cache.has(id));
+}
+
+async function hideOtherStaff(interaction, claimedUserId) {
+  for (const roleId of allConfiguredStaffRoleIds(interaction.guild)) {
+    await interaction.channel.permissionOverwrites.edit(roleId, {
+      ViewChannel: false,
+      SendMessages: false,
+      ReadMessageHistory: false
+    });
+  }
+
+  // La excepción de miembro se aplica después de los roles para que el Staff
+  // que reclamó conserve el acceso aunque pertenezca a uno de esos roles.
+  await interaction.channel.permissionOverwrites.edit(claimedUserId, {
+    ViewChannel: true,
+    SendMessages: true,
+    ReadMessageHistory: true
+  });
+
+  const creatorId = await getTicketCreatorDiscordId(await getTicket(interaction.channelId));
+  if (creatorId) {
+    await interaction.channel.permissionOverwrites.edit(creatorId, {
+      ViewChannel: true,
+      SendMessages: true,
+      ReadMessageHistory: true
+    });
+  }
 }
 
 async function claimTicket(interaction) {
@@ -86,12 +148,9 @@ async function claimTicket(interaction) {
 
   await updateTicket(ticket.id, {assigned_to_discord_user_id: interaction.user.id});
   await addTicketEvent(ticket.id, interaction.user.id, 'assigned', null, {});
+  await hideOtherStaff(interaction, interaction.user.id);
+  await writeLog({guild:interaction.guild,category:'ticket',action:'claim',actorId:interaction.user.id,channelId:interaction.channelId,message:`Ticket ${ticket.id} reclamado.`});
 
-  await interaction.channel.permissionOverwrites.edit(interaction.user.id, {
-    ViewChannel: true,
-    SendMessages: true,
-    ReadMessageHistory: true
-  });
   await interaction.channel.send({content:`El ticket ha sido reclamado por <@${interaction.user.id}>.`});
   return interaction.reply({content:'Has reclamado este ticket. Ahora puedes responder al miembro.',ephemeral:true});
 }
@@ -101,22 +160,26 @@ async function closeTicket(interaction) {
   if (!ticket) return interaction.reply({content:'Este canal no corresponde a un ticket abierto.',ephemeral:true});
   if (!memberCanHandleTicket(interaction, ticket)) return interaction.reply({content:'No tienes permiso para cerrar este ticket.',ephemeral:true});
 
+  const channel = interaction.channel;
   await updateTicket(ticket.id, {
     status: 'closed',
     closed_by_discord_user_id: interaction.user.id,
     closed_at: new Date().toISOString()
   });
   await addTicketEvent(ticket.id, interaction.user.id, 'closed', null, {assigned_to_discord_user_id: ticket.assigned_to_discord_user_id || null});
-  await writeLog({guild:interaction.guild,category:'ticket',action:'close',actorId:interaction.user.id,channelId:interaction.channelId,message:`Ticket ${ticket.id} cerrado.`});
+  await writeLog({guild:interaction.guild,category:'ticket',action:'close',actorId:interaction.user.id,channelId:channel.id,message:`Ticket ${ticket.id} cerrado.`});
 
-  const creatorId = await getTicketCreatorDiscordId(ticket);
-  await interaction.channel.permissionOverwrites.edit(interaction.guild.roles.everyone.id, {ViewChannel:false,SendMessages:false});
-  if (creatorId) await interaction.channel.permissionOverwrites.edit(creatorId, {ViewChannel:true,SendMessages:false,ReadMessageHistory:true});
-  for (const roleId of ticketAccessRoleIds(interaction.guild, ticket.ticket_type === 'support' ? 'soporte' : ticket.ticket_type === 'report' ? 'reporte' : ticket.ticket_type === 'alliance_partner' ? 'alianza' : 'contacto')) {
-    await interaction.channel.permissionOverwrites.edit(roleId, {ViewChannel:true,SendMessages:false,ReadMessageHistory:true});
-  }
-  await interaction.channel.send({content:`Este ticket ha sido cerrado por <@${interaction.user.id}>.`});
-  return interaction.reply({content:'Ticket cerrado correctamente.',ephemeral:true});
+  await interaction.reply({content:'Ticket cerrado. El canal será eliminado en unos segundos.',ephemeral:true});
+
+  setTimeout(async () => {
+    try {
+      await channel.delete('Ticket cerrado');
+      console.log(`[HYPNOX] Ticket channel eliminado: ${channel.id}`);
+    } catch (error) {
+      console.error(`[HYPNOX] No se pudo eliminar el canal del ticket ${channel.id}:`, error);
+      await writeLog({guild:interaction.guild,category:'ticket',action:'delete_failed',actorId:interaction.user.id,channelId:channel.id,message:error?.message || 'Error desconocido'}).catch(() => {});
+    }
+  }, 2000);
 }
 
 function registerEvents(client) {
@@ -147,7 +210,7 @@ function registerEvents(client) {
       if (!commandAccessAllowed(interaction,command,guildType)) return interaction.reply({content:'No tienes el rol necesario para usar este comando.',ephemeral:true});
       await command.execute(interaction,client);
     } catch (error) {
-      console.error('[HYPNOX] Interaction error:',error); const payload={content:'No se pudo completar la acción.',ephemeral:true};
+      console.error('[HYPNOX] Interaction error:', error); const payload={content:'No se pudo completar la acción.',ephemeral:true};
       if (interaction.replied || interaction.deferred) await interaction.followUp(payload).catch(() => {}); else await interaction.reply(payload).catch(() => {});
     }
   });
