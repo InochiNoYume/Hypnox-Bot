@@ -6,7 +6,7 @@ const { brandedEmbed } = require('../utils/embeds');
 
 const MANAGEMENT_ROLES = [
   'OFFICIAL_ROLE_FOUNDER_ID', 'OFFICIAL_ROLE_DIRECTOR_ID', 'OFFICIAL_ROLE_ADMINISTRATOR_ID',
-  'STAFF_ROLE_FOUNDER_ID', 'STAFF_ROLE_DIRECTOR_ID', 'STAFF_ROLE_ADMINISTRATOR_ID'
+  'STAFF_ROLE_FOUNDER_ID', 'STAFF_ROLE_DIRECTOR_ID', 'STAFF_ROLE_ADMINISTRATIVE_ASSISTANT_ID'
 ];
 
 const data = new SlashCommandBuilder()
@@ -67,7 +67,8 @@ async function execute(interaction) {
         new ButtonBuilder().setCustomId(`hypnox_giveaway:${giveaway.id}`).setLabel('Participar').setStyle(ButtonStyle.Secondary)
       )];
       const message = await interaction.channel.send({ embeds: [embed], components });
-      await supabase.from('giveaways').update({ message_id: message.id }).eq('id', giveaway.id);
+      const { error: messageError } = await supabase.from('giveaways').update({ message_id: message.id }).eq('id', giveaway.id);
+      if (messageError) throw messageError;
       await writeLog({ guild: interaction.guild, category: 'giveaway', action: 'create', actorId: interaction.user.id, message: giveaway.title });
       return interaction.reply({ content: `Sorteo creado: \`${giveaway.id}\``, ephemeral: true });
     }
@@ -84,23 +85,29 @@ async function execute(interaction) {
       .select('*').eq('id', id).eq('guild_id', guild.id).maybeSingle();
     if (error) throw error;
     if (!giveaway) return interaction.reply({ content: 'No se encontró el sorteo indicado.', ephemeral: true });
+    if (giveaway.status !== 'active' && sub === 'finalizar') return interaction.reply({ content: 'Este sorteo ya no está activo.', ephemeral: true });
 
     const { data: entries, error: entriesError } = await supabase
       .from('giveaway_entries').select('user_id').eq('giveaway_id', id);
     if (entriesError) throw entriesError;
 
-    const pool = (entries || []).map((entry) => entry.user_id).sort(() => Math.random() - 0.5);
+    const pool = (entries || []).map((entry) => entry.user_id);
+    if (!pool.length) return interaction.reply({ content: 'No hay participantes para seleccionar.', ephemeral: true });
+    for (let i = pool.length - 1; i > 0; i -= 1) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [pool[i], pool[j]] = [pool[j], pool[i]];
+    }
     const winnerIds = pool.slice(0, giveaway.winner_count);
-    const { data: users } = winnerIds.length
-      ? await supabase.from('users').select('id,discord_user_id').in('id', winnerIds)
-      : { data: [] };
+    const { data: users, error: usersError } = await supabase.from('users').select('id,discord_user_id').in('id', winnerIds);
+    if (usersError) throw usersError;
     const mentions = (users || []).map((user) => `◆ <@${user.discord_user_id}>`);
 
-    await supabase.from('giveaways').update({
+    const { error: finishError } = await supabase.from('giveaways').update({
       status: 'finished',
       winners: winnerIds,
       finished_at: new Date().toISOString()
     }).eq('id', id);
+    if (finishError) throw finishError;
 
     await writeLog({
       guild: interaction.guild,
