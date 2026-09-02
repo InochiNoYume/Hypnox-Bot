@@ -47,7 +47,7 @@ async function bootstrap() {
   registerEvents(client);
   registerPrefix(client);
 
-  client.once('ready', async () => {
+  client.once('clientReady', async () => {
     console.log(`[HYPNOX] Conectado como ${client.user.tag}`);
 
     try {
