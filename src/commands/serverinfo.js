@@ -2,14 +2,11 @@ const { SlashCommandBuilder } = require('discord.js');
 const { baseEmbed } = require('../utils/embeds');
 
 module.exports = {
-  data: new SlashCommandBuilder()
-    .setName('serverinfo')
-    .setDescription('Muestra información del servidor.'),
+  data: new SlashCommandBuilder().setName('serverinfo').setDescription('Muestra información del servidor.'),
 
   async execute(interaction) {
     const guild = interaction.guild;
     const owner = await guild.fetchOwner();
-
     const embed = baseEmbed('INFORMACIÓN DEL SERVIDOR', guild.name)
       .setThumbnail(guild.iconURL({ size: 256 }) || null)
       .addFields(
@@ -18,7 +15,9 @@ module.exports = {
         { name: 'Propietario', value: owner.user.tag, inline: true },
         { name: 'Creado', value: `<t:${Math.floor(guild.createdTimestamp / 1000)}:F>`, inline: false }
       );
-
     await interaction.reply({ embeds: [embed] });
-  }
+  },
+
+  guilds: ['official'],
+  access: { roleEnvs: ['OFFICIAL_ROLE_MEMBER_ID'] }
 };
