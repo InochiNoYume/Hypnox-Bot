@@ -11,7 +11,7 @@ const CATEGORIES = {
   anuncios: { title: 'ANUNCIOS', description: 'Publicación de comunicaciones, actividades, dinámicas, series y contenido oficial.', guilds: ['official', 'staff'] },
   eventos: { title: 'EVENTOS', description: 'Creación y gestión del ciclo de vida de los eventos de Hypnox Studios.', guilds: ['official', 'staff'] },
   premios: { title: 'PREMIOS', description: 'Gestión de sorteos, premios, ganadores y entregas.', guilds: ['official', 'staff'] },
-  postulaciones: { title: 'POSTULACIONES', description: 'Apertura, cierre y publicación de resultados del proceso de incorporación de Staff.', guilds: ['official'] },
+  postulaciones: { title: 'POSTULACIONES', description: 'Gestión de convocatorias y publicación de información, requisitos, estados y resultados del proceso de incorporación de Staff.', guilds: ['official', 'applications'] },
   proyectos: { title: 'PROYECTOS', description: 'Gestión interna de proyectos, responsables, estados y planificación.', guilds: ['staff'] },
   administracion: { title: 'ADMINISTRACIÓN', description: 'Configuración avanzada del bot y parámetros internos de cada servidor.', guilds: ['official', 'staff', 'applications'] }
 };
@@ -24,7 +24,7 @@ const COMMANDS = {
   anuncios: ['/anuncio'],
   eventos: ['/evento crear', '/evento editar', '/evento cancelar', '/evento iniciar', '/evento finalizar'],
   premios: ['/premio crear', '/premio finalizar', '/premio reroll', '/premio entregar'],
-  postulaciones: ['/abierto', '/cerrado', '/aceptado'],
+  postulaciones: ['/abierto', '/cerrado', '/aceptado', '/requisitos', '/informacion', '/postular', '/resultado', '/estado-postulacion', '/reglamento-interno'],
   proyectos: ['/proyecto crear', '/proyecto editar', '/proyecto estado', '/proyecto cerrar', '/proyecto asignar'],
   administracion: ['/administracion config', '/administracion set-channel', '/administracion set-role', '/administracion set-permission', '/administracion maintenance', '/administracion reload']
 };
@@ -55,25 +55,20 @@ async function execute(interaction) {
       .map(([, category]) => category);
 
     const embed = brandedEmbed('CENTRO DE AYUDA', 'Panel de referencia de Hypnox Studios. Las categorías mostradas corresponden a los permisos disponibles para tu rol en este servidor.');
-    if (available.length) {
-      embed.addFields(available.map((category) => ({ name: `◆ ${category.title}`, value: category.description, inline: false })));
-    } else {
-      embed.addFields({ name: '◆ ACCESO', value: 'No hay categorías disponibles para los roles configurados en este servidor.', inline: false });
-    }
+    if (available.length) embed.addFields(available.map((category) => ({ name: `◆ ${category.title}`, value: category.description, inline: false })));
+    else embed.addFields({ name: '◆ ACCESO', value: 'No hay categorías disponibles para los roles configurados en este servidor.', inline: false });
     embed.setFooter({ text: `Hypnox Studios • ${available.length} categoría${available.length === 1 ? '' : 's'} disponible${available.length === 1 ? '' : 's'}.` });
     return interaction.reply({ embeds: [embed], ephemeral: true });
   }
 
   const category = CATEGORIES[subcommand];
-  if (!category || !category.guilds.includes(guildType)) {
-    return interaction.reply({ content: 'Esta categoría no está disponible en este servidor.', ephemeral: true });
-  }
+  if (!category || !category.guilds.includes(guildType)) return interaction.reply({ content: 'Esta categoría no está disponible en este servidor.', ephemeral: true });
+  if (!canViewHelpCategory(interaction.member, subcommand)) return interaction.reply({ content: 'No tienes el rol necesario para consultar esta categoría.', ephemeral: true });
 
-  if (!canViewHelpCategory(interaction.member, subcommand)) {
-    return interaction.reply({ content: 'No tienes el rol necesario para consultar esta categoría.', ephemeral: true });
-  }
+  let commands = COMMANDS[subcommand] || [];
+  if (subcommand === 'postulaciones' && guildType === 'official') commands = ['/abierto', '/cerrado', '/aceptado'];
+  if (subcommand === 'postulaciones' && guildType === 'applications') commands = ['/requisitos', '/informacion', '/postular', '/resultado', '/estado-postulacion'];
 
-  const commands = COMMANDS[subcommand] || [];
   const embed = brandedEmbed(category.title, category.description);
   embed.addFields({ name: '◆ COMANDOS DISPONIBLES', value: commands.length ? commands.map((command) => `\`${command}\``).join('\n') : 'No hay comandos configurados en esta categoría.', inline: false });
   embed.setFooter({ text: `Hypnox Studios • ${commands.length} comando${commands.length === 1 ? '' : 's'} disponible${commands.length === 1 ? '' : 's'}.` });
