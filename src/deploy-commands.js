@@ -29,7 +29,7 @@ async function deploy() {
     if (!guildId) continue;
 
     const body = commands
-      .filter((command) => command.guilds.includes(guildType))
+      .filter((command) => guildType === 'dev' || command.guilds.includes(guildType))
       .map((command) => command.data.toJSON());
 
     await rest.put(
