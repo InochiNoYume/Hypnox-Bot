@@ -1,14 +1,16 @@
 const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
 const { getEnv } = require('../config/env');
 
+const STAFF = ['OFFICIAL_ROLE_FOUNDER_ID', 'OFFICIAL_ROLE_DIRECTOR_ID', 'OFFICIAL_ROLE_ADMINISTRATOR_ID'];
+const isAdmin = (member) => STAFF.some((env) => { const id = getEnv(env); return id && member?.roles?.cache?.has(id); });
+
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('faq')
     .setDescription('Publica las preguntas frecuentes del Discord oficial.'),
 
   async execute(interaction) {
-    const roleId = getEnv('OFFICIAL_ROLE_MEMBER_ID');
-    if (!interaction.member?.roles?.cache?.has(roleId)) return interaction.reply({ content: 'No tienes permisos para publicar las preguntas frecuentes.', ephemeral: true });
+    if (!isAdmin(interaction.member)) return interaction.reply({ content: 'No tienes permisos para publicar las preguntas frecuentes.', ephemeral: true });
     const channelId = getEnv('OFFICIAL_CHANNEL_FAQ_ID');
     const channel = channelId ? await interaction.guild.channels.fetch(channelId).catch(() => null) : null;
     if (!channel?.isTextBased()) return interaction.reply({ content: 'Configura OFFICIAL_CHANNEL_FAQ_ID en el entorno del bot.', ephemeral: true });
