@@ -1,5 +1,5 @@
 const { SlashCommandBuilder, ActionRowBuilder, StringSelectMenuBuilder } = require('discord.js');
-const { createTicket, getTicket, getTicketCreatorDiscordId, updateTicket, addTicketEvent } = require('../services/tickets');
+const { getTicket, getTicketCreatorDiscordId, updateTicket, addTicketEvent } = require('../services/tickets');
 const { writeLog } = require('../services/logs');
 const { getEnv } = require('../config/env');
 const { hasConfiguredRole } = require('../utils/permissions');
@@ -7,6 +7,7 @@ const { brandedEmbed } = require('../utils/embeds');
 
 const STAFF_ROLE_ENVS = [
   'OFFICIAL_ROLE_FOUNDER_ID','OFFICIAL_ROLE_DIRECTOR_ID','OFFICIAL_ROLE_ADMINISTRATOR_ID',
+  'OFFICIAL_ROLE_DEVELOPER_ID','OFFICIAL_ROLE_PRODUCER_ID',
   'OFFICIAL_ROLE_SRMOD_ID','OFFICIAL_ROLE_MOD_ID','OFFICIAL_ROLE_TMOD_ID','OFFICIAL_ROLE_HELPER_ID'
 ];
 
