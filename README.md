@@ -17,6 +17,17 @@ El bot utiliza una única aplicación de Discord y una única base de datos de S
 - Los registros se almacenan en Supabase y cada servidor utiliza un único canal de logs configurado.
 - `DISCORD_TOKEN` y `SUPABASE_SERVICE_ROLE_KEY` nunca deben publicarse.
 
+## Autoroles
+
+El bot asigna automáticamente un rol cuando un usuario entra a los servidores correspondientes:
+
+- **Staff Team Discord:** asigna `STAFF_ROLE_TRAINEE_ID` → **Trainee**.
+- **Staff Applications Discord:** asigna `APPLICATIONS_ROLE_APPLICANT_ID` → **Applicant**.
+
+El sistema utiliza el evento `guildMemberAdd` y requiere el intent **Guild Members** y que el bot tenga permiso para gestionar los roles. El rol que se asigna debe estar por debajo del rol máximo del bot en la jerarquía de Discord.
+
+Los autoroles solo se asignan al momento de entrada. Cambiar una variable de entorno no aplica retroactivamente el rol a miembros que ya estaban dentro del servidor.
+
 ## Postulaciones
 
 El flujo actual es deliberadamente simple:
@@ -69,6 +80,7 @@ Los valores de interfaz se normalizan antes de guardarse en Supabase. La base de
 - **Premios:** sorteos, participación, finalización, reroll y registro de entrega.
 - **Proyectos:** creación, edición, estado, cierre y asignación de manager.
 - **Postulaciones:** apertura, cierre, resultados, requisitos, FAQ y documentación del proceso.
+- **Autoroles:** asignación automática de Trainee en Staff Team y Applicant en Staff Applications.
 - **Administración:** configuración, canales, roles, permisos, mantenimiento y recarga.
 - **Logs:** un canal de logs por servidor y persistencia en Supabase.
 
@@ -80,9 +92,10 @@ Los valores de interfaz se normalizan antes de guardarse en Supabase. La base de
 
 1. Copia `.env.example` a `.env`.
 2. Completa las credenciales, IDs de servidores, roles y canales necesarios.
-3. Ejecuta `npm install`.
-4. Registra los comandos con `npm run deploy` cuando corresponda.
-5. Inicia el bot con `npm start`.
+3. Para los autoroles, configura `STAFF_ROLE_TRAINEE_ID` y `APPLICATIONS_ROLE_APPLICANT_ID`.
+4. Ejecuta `npm install`.
+5. Registra los comandos con `npm run deploy` cuando corresponda.
+6. Inicia el bot con `npm start`.
 
 En Wispbyte, después de actualizar el repositorio, reinicia el servicio para que descargue los cambios y vuelva a cargar las variables de entorno.
 
@@ -94,7 +107,7 @@ La configuración operativa se mantiene fuera del código.
 
 Incluye IDs para Dirección, Administración, moderación, **Developer**, **Producer**, canales de tickets, anuncios, postulaciones, información, FAQ y reglamento.
 
-Para Bugs / Errores son obligatorias las siguientes variables si se quiere habilitar ese acceso:
+Para Bugs / Errores son necesarias las siguientes variables si se quiere habilitar ese acceso:
 
 ```env
 OFFICIAL_ROLE_DEVELOPER_ID=
@@ -103,9 +116,25 @@ OFFICIAL_ROLE_PRODUCER_ID=
 
 `OFFICIAL_TICKET_STAFF_MENTION_ROLE_ID` es opcional y se utiliza únicamente para mencionar el rol configurado al crear un ticket.
 
+### Staff Team Discord
+
+El autorole de incorporación utiliza:
+
+```env
+STAFF_ROLE_TRAINEE_ID=
+```
+
+### Staff Applications Discord
+
+El autorole de incorporación utiliza:
+
+```env
+APPLICATIONS_ROLE_APPLICANT_ID=
+```
+
 ### Otros servidores
 
-Staff Team y Staff Applications mantienen sus propios IDs de roles y canales porque los roles de Discord son específicos de cada servidor. Un ID de rol de Staff Team no puede utilizarse como reemplazo del ID equivalente en Official Discord.
+Staff Team y Staff Applications mantienen sus propios IDs de roles y canales porque los roles de Discord son específicos de cada servidor. Un ID de rol de Staff Team no puede utilizarse como reemplazo del ID equivalente en otro servidor.
 
 ## Base de datos y migraciones
 
@@ -140,6 +169,7 @@ El repositorio actualmente no incluye `package-lock.json`; si se incorpora uno e
 - Nunca publiques `SUPABASE_SERVICE_ROLE_KEY`.
 - Mantén RLS habilitado en las tablas expuestas de Supabase.
 - Los permisos del bot deben configurarse mediante IDs y no mediante nombres de roles.
+- El rol máximo del bot debe estar por encima de los roles de autorole que necesita asignar.
 - Antes de aplicar una migración sobre producción, verifica el estado actual de la base de datos.
 
 ## Repositorio
