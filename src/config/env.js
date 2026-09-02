@@ -10,21 +10,23 @@ const required = [
 
 function validateEnv() {
   const missing = required.filter((key) => !process.env[key]);
-  if (missing.length) {
-    throw new Error(`Variables de entorno faltantes: ${missing.join(', ')}`);
-  }
+  if (missing.length) throw new Error(`Variables de entorno faltantes: ${missing.join(', ')}`);
 }
 
-function getEnv(key, fallback = undefined) {
-  return process.env[key] ?? fallback;
-}
+function getEnv(key, fallback = undefined) { return process.env[key] ?? fallback; }
 
-function getGuildIds() {
-  return {
-    official: getEnv('OFFICIAL_GUILD_ID'),
-    staff: getEnv('STAFF_GUILD_ID'),
-    applications: getEnv('APPLICATIONS_GUILD_ID')
-  };
-}
+const guilds = {
+  official: getEnv('OFFICIAL_GUILD_ID'),
+  staff: getEnv('STAFF_GUILD_ID'),
+  applications: getEnv('APPLICATIONS_GUILD_ID')
+};
 
-module.exports = { validateEnv, getEnv, getGuildIds };
+const logs = {
+  official: getEnv('OFFICIAL_LOGS_CHANNEL_ID'),
+  staff: getEnv('STAFF_LOGS_CHANNEL_ID'),
+  applications: getEnv('APPLICATIONS_LOGS_CHANNEL_ID')
+};
+
+function getGuildIds() { return guilds; }
+
+module.exports = { validateEnv, getEnv, getGuildIds, guilds, logs };
