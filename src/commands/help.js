@@ -1,19 +1,18 @@
 const { SlashCommandBuilder } = require('discord.js');
 const { brandedEmbed } = require('../utils/embeds');
-const { canViewHelpCategory } = require('../utils/helpPermissions');
 const { getGuildType } = require('../utils/guild');
 
 const CATEGORIES = {
-  informacion: { title: 'INFORMACIÓN', description: 'Comandos generales para consultar información, normativa y enlaces oficiales.' },
-  comunidad: { title: 'COMUNIDAD', description: 'Herramientas disponibles para los miembros del servidor oficial.' },
-  moderacion: { title: 'MODERACIÓN', description: 'Herramientas destinadas al control, seguridad y convivencia de la comunidad.' },
-  tickets: { title: 'TICKETS', description: 'Gestión del sistema de soporte, reportes, alianzas, partners y contacto.' },
-  anuncios: { title: 'ANUNCIOS', description: 'Publicación de comunicaciones, actividades, dinámicas, series y contenido oficial.' },
-  eventos: { title: 'EVENTOS', description: 'Creación y gestión del ciclo completo de eventos de Hypnox Studios.' },
-  premios: { title: 'PREMIOS', description: 'Gestión de sorteos, premios, ganadores y entregas.' },
-  postulaciones: { title: 'POSTULACIONES', description: 'Apertura, cierre y publicación de resultados del proceso de incorporación de Staff.' },
-  proyectos: { title: 'PROYECTOS', description: 'Gestión interna de proyectos, responsables, estados y planificación.' },
-  administracion: { title: 'ADMINISTRACIÓN', description: 'Configuración avanzada del bot y parámetros internos de cada servidor.' }
+  informacion: { title: 'INFORMACIÓN', description: 'Recursos públicos de Hypnox Studios: información, normativa, roles y enlaces oficiales.', guilds: ['official'] },
+  comunidad: { title: 'COMUNIDAD', description: 'Herramientas destinadas a los miembros de la comunidad oficial.', guilds: ['official'] },
+  moderacion: { title: 'MODERACIÓN', description: 'Herramientas para mantener el orden, la seguridad y la convivencia dentro de los servidores.', guilds: ['official', 'staff'] },
+  tickets: { title: 'TICKETS', description: 'Gestión del sistema de soporte, reportes, alianzas, partners y contacto.', guilds: ['official'] },
+  anuncios: { title: 'ANUNCIOS', description: 'Publicación de comunicaciones, actividades, dinámicas, series y contenido oficial.', guilds: ['official', 'staff'] },
+  eventos: { title: 'EVENTOS', description: 'Creación y gestión del ciclo de vida de los eventos de Hypnox Studios.', guilds: ['official', 'staff'] },
+  premios: { title: 'PREMIOS', description: 'Gestión de sorteos, premios, ganadores y entregas.', guilds: ['official', 'staff'] },
+  postulaciones: { title: 'POSTULACIONES', description: 'Apertura, cierre y publicación de resultados del proceso de incorporación de Staff.', guilds: ['official'] },
+  proyectos: { title: 'PROYECTOS', description: 'Gestión interna de proyectos, responsables, estados y planificación.', guilds: ['staff'] },
+  administracion: { title: 'ADMINISTRACIÓN', description: 'Configuración avanzada del bot y parámetros internos de cada servidor.', guilds: ['official', 'staff', 'applications'] }
 };
 
 const COMMANDS = {
@@ -49,27 +48,21 @@ async function execute(interaction) {
   const guildType = getGuildType(interaction.guildId);
 
   if (subcommand === 'inicio') {
-    const embed = brandedEmbed('CENTRO DE AYUDA', 'Consulta las categorías disponibles para este servidor y utiliza el subcomando correspondiente para ver sus herramientas.');
-    embed.addFields(Object.values(CATEGORIES).map((category) => ({
-      name: `◆ ${category.title}`,
-      value: category.description,
-      inline: false
-    })));
-    embed.setFooter({ text: 'Hypnox Studios • Usa /help <categoría> para consultar los comandos.' });
+    const available = Object.values(CATEGORIES).filter((category) => category.guilds.includes(guildType));
+    const embed = brandedEmbed('CENTRO DE AYUDA', 'Panel de referencia de Hypnox Studios. Selecciona una categoría para consultar las herramientas disponibles en este servidor.');
+    embed.addFields(available.map((category) => ({ name: `◆ ${category.title}`, value: category.description, inline: false })));
+    embed.setFooter({ text: `Hypnox Studios • ${available.length} categorías disponibles.` });
     return interaction.reply({ embeds: [embed], ephemeral: true });
   }
 
-  if (!canViewHelpCategory(interaction.member, subcommand)) {
-    return interaction.reply({ content: 'No tienes el rol necesario para consultar esta categoría.', ephemeral: true });
+  const category = CATEGORIES[subcommand];
+  if (!category || !category.guilds.includes(guildType)) {
+    return interaction.reply({ content: 'Esta categoría no está disponible en este servidor.', ephemeral: true });
   }
 
   const commands = COMMANDS[subcommand] || [];
-  const unavailable = guildType === 'applications' && ['tickets', 'anuncios', 'eventos', 'premios', 'postulaciones', 'proyectos'].includes(subcommand);
-  const description = unavailable
-    ? `${CATEGORIES[subcommand].description}\n\nEsta categoría no está habilitada en este servidor.`
-    : `${CATEGORIES[subcommand].description}\n\n${commands.map((command) => `◆ \`${command}\``).join('\n')}`;
-
-  const embed = brandedEmbed(CATEGORIES[subcommand].title, description);
+  const embed = brandedEmbed(category.title, category.description);
+  embed.addFields({ name: '◆ COMANDOS DISPONIBLES', value: commands.length ? commands.map((command) => `\`${command}\``).join('\n') : 'No hay comandos configurados en esta categoría.', inline: false });
   embed.setFooter({ text: `Hypnox Studios • ${commands.length} comando${commands.length === 1 ? '' : 's'} disponible${commands.length === 1 ? '' : 's'}.` });
   return interaction.reply({ embeds: [embed], ephemeral: true });
 }
