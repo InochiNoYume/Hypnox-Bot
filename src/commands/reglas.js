@@ -55,5 +55,5 @@ module.exports = {
   },
 
   guilds: ['official'],
-  access: { roleEnvs: ['OFFICIAL_ROLE_MEMBER_ID'] }
+  access: { roleEnvs: ['OFFICIAL_ROLE_FOUNDER_ID', 'OFFICIAL_ROLE_DIRECTOR_ID', 'OFFICIAL_ROLE_ADMINISTRATOR_ID'] }
 };
