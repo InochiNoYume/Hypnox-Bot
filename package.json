@@ -12,8 +12,8 @@
     "node": ">=22.0.0"
   },
   "dependencies": {
-    "@supabase/supabase-js": "latest",
-    "discord.js": "latest",
-    "dotenv": "latest"
+    "@supabase/supabase-js": "2.112.4",
+    "discord.js": "14.27.0",
+    "dotenv": "17.4.2"
   }
 }
