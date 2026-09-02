@@ -2,6 +2,7 @@ require('dotenv').config();
 
 const { Client, GatewayIntentBits, Collection, REST, Routes } = require('discord.js');
 const { validateEnv, getEnv } = require('./config/env');
+const { getGuildType } = require('./utils/guild');
 const supabase = require('./database/supabase');
 const loadCommands = require('./handlers/loadCommands');
 const registerEvents = require('./handlers/registerEvents');
