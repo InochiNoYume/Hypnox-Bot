@@ -35,6 +35,37 @@ async function registerSlashCommands(client) {
   }
 }
 
+async function assignAutoRole(member, roleEnv, label) {
+  const roleId = getEnv(roleEnv);
+  if (!roleId || !member.guild.roles.cache.has(roleId)) {
+    console.warn(`[HYPNOX] Autorole ${label} no configurado o no encontrado en ${member.guild.name}.`);
+    return;
+  }
+  if (member.roles.cache.has(roleId)) return;
+
+  try {
+    await member.roles.add(roleId, `Autorole Hypnox — ${label}`);
+    console.log(`[HYPNOX] Autorole asignado: ${label} -> ${member.user.tag} en ${member.guild.name}`);
+  } catch (error) {
+    console.error(`[HYPNOX] No se pudo asignar autorole ${label} a ${member.user.tag}:`, error.message);
+  }
+}
+
+function registerAutoRoles(client) {
+  client.on('guildMemberAdd', async (member) => {
+    try {
+      const guildType = getGuildType(member.guild.id);
+      if (guildType === 'staff') {
+        await assignAutoRole(member, 'STAFF_ROLE_TRAINEE_ID', 'Trainee');
+      } else if (guildType === 'applications') {
+        await assignAutoRole(member, 'APPLICATIONS_ROLE_APPLICANT_ID', 'Applicant');
+      }
+    } catch (error) {
+      console.error('[HYPNOX] Error procesando autorole:', error);
+    }
+  });
+}
+
 async function bootstrap() {
   validateEnv();
   const client = new Client({
@@ -50,6 +81,7 @@ async function bootstrap() {
   loadCommands(client);
   registerEvents(client);
   registerPrefix(client);
+  registerAutoRoles(client);
 
   client.once('clientReady', async () => {
     console.log(`[HYPNOX] Conectado como ${client.user.tag}`);
