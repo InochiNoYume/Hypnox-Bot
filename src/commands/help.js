@@ -1,6 +1,7 @@
 const { SlashCommandBuilder } = require('discord.js');
 const { brandedEmbed } = require('../utils/embeds');
 const { getGuildType } = require('../utils/guild');
+const { canViewHelpCategory } = require('../utils/helpPermissions');
 
 const CATEGORIES = {
   informacion: { title: 'INFORMACIÓN', description: 'Recursos públicos de Hypnox Studios: información, normativa, roles y enlaces oficiales.', guilds: ['official'] },
@@ -48,16 +49,28 @@ async function execute(interaction) {
   const guildType = getGuildType(interaction.guildId);
 
   if (subcommand === 'inicio') {
-    const available = Object.values(CATEGORIES).filter((category) => category.guilds.includes(guildType));
-    const embed = brandedEmbed('CENTRO DE AYUDA', 'Panel de referencia de Hypnox Studios. Selecciona una categoría para consultar las herramientas disponibles en este servidor.');
-    embed.addFields(available.map((category) => ({ name: `◆ ${category.title}`, value: category.description, inline: false })));
-    embed.setFooter({ text: `Hypnox Studios • ${available.length} categorías disponibles.` });
+    const available = Object.entries(CATEGORIES)
+      .filter(([, category]) => category.guilds.includes(guildType))
+      .filter(([key]) => canViewHelpCategory(interaction.member, key))
+      .map(([, category]) => category);
+
+    const embed = brandedEmbed('CENTRO DE AYUDA', 'Panel de referencia de Hypnox Studios. Las categorías mostradas corresponden a los permisos disponibles para tu rol en este servidor.');
+    if (available.length) {
+      embed.addFields(available.map((category) => ({ name: `◆ ${category.title}`, value: category.description, inline: false })));
+    } else {
+      embed.addFields({ name: '◆ ACCESO', value: 'No hay categorías disponibles para los roles configurados en este servidor.', inline: false });
+    }
+    embed.setFooter({ text: `Hypnox Studios • ${available.length} categoría${available.length === 1 ? '' : 's'} disponible${available.length === 1 ? '' : 's'}.` });
     return interaction.reply({ embeds: [embed], ephemeral: true });
   }
 
   const category = CATEGORIES[subcommand];
   if (!category || !category.guilds.includes(guildType)) {
     return interaction.reply({ content: 'Esta categoría no está disponible en este servidor.', ephemeral: true });
+  }
+
+  if (!canViewHelpCategory(interaction.member, subcommand)) {
+    return interaction.reply({ content: 'No tienes el rol necesario para consultar esta categoría.', ephemeral: true });
   }
 
   const commands = COMMANDS[subcommand] || [];
