@@ -25,6 +25,8 @@ El sistema de tickets funciona únicamente en el **Official Discord** mediante u
 
 Los permisos se resuelven mediante IDs de roles configurados en las variables de entorno. Al reclamar un ticket, se oculta al resto del Staff y se conserva el acceso del creador y del miembro que lo reclamó. Los usuarios con permiso de Administrador de Discord pueden seguir accediendo por las reglas de permisos de Discord.
 
+El formulario utiliza categorías internas en español para la interfaz y las normaliza a los valores aceptados por la base de datos (`support`, `report`, `alliance_partner`, `contact`). Esto evita que la creación del canal dependa directamente de los valores del esquema SQL.
+
 ## Módulos
 - **Información:** help, reglas, roles, links e información general.
 - **Comunidad:** `/user`, `/serverinfo` y `/credits`, restringidos al ID del rol de miembro del Official Discord.
