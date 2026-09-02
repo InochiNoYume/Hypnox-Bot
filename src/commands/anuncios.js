@@ -50,11 +50,11 @@ const data = new SlashCommandBuilder()
     .addChoices(...Object.entries(TYPES).map(([value, config]) => ({ name: config.label, value }))))
   .addStringOption((option) => option
     .setName('titulo')
-    .setDescription('Título principal que aparecerá en la publicación.')
+    .setDescription('Título principal de la publicación.')
     .setRequired(true))
   .addStringOption((option) => option
     .setName('contenido')
-    .setDescription('Mensaje que se mostrará a la comunidad.')
+    .setDescription('Contenido principal que recibirá la comunidad.')
     .setRequired(true))
   .addStringOption((option) => option
     .setName('imagen')
@@ -70,11 +70,12 @@ async function execute(interaction) {
   const image = interaction.options.getString('imagen') || getEnv('OFFICIAL_IMAGE_ANNOUNCEMENT');
   const config = TYPES[type];
 
-  const embed = brandedEmbed(config.label, content, { image });
-  embed.setFields(
-    { name: 'PUBLICACIÓN', value: title, inline: false },
-    { name: 'INFORMACIÓN', value: config.description, inline: false }
-  );
+  const embed = brandedEmbed(title, content, { image });
+  embed.addFields({
+    name: '◆ CLASIFICACIÓN',
+    value: `**${config.label}**\n${config.description}`,
+    inline: false
+  });
 
   const message = await interaction.channel.send({ embeds: [embed] });
   const { error } = await supabase.from('announcements').insert({
