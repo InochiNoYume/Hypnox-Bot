@@ -1,38 +1,36 @@
 const { ChannelType, PermissionFlagsBits } = require('discord.js');
 const { getGuildType } = require('../utils/guild');
-const { getEnv } = require('../config/env');
 const { createTicket, addTicketEvent } = require('../services/tickets');
 const { writeLog } = require('../services/logs');
+const supabase = require('../database/supabase');
 
 function registerEvents(client) {
   client.on('interactionCreate', async (interaction) => {
     try {
+      if (interaction.isButton() && interaction.customId.startsWith('hypnox_giveaway:')) {
+        const giveawayId = interaction.customId.split(':')[1];
+        const { data: giveaway } = await supabase.from('giveaways').select('id,status,ends_at').eq('id', giveawayId).maybeSingle();
+        if (!giveaway || giveaway.status !== 'active' || new Date(giveaway.ends_at) <= new Date()) return interaction.reply({ content: 'Este sorteo ya finalizó.', ephemeral: true });
+        const { error } = await supabase.from('giveaway_entries').insert({ giveaway_id: giveawayId, user_id: interaction.user.id });
+        if (error?.code === '23505') return interaction.reply({ content: 'Ya estás participando en este sorteo.', ephemeral: true });
+        if (error) throw error;
+        return interaction.reply({ content: 'Tu participación fue registrada.', ephemeral: true });
+      }
       if (interaction.isStringSelectMenu() && interaction.customId === 'hypnox_ticket_type') {
         const type = interaction.values[0];
-        const category = interaction.channel?.parent;
-        const channel = await interaction.guild.channels.create({
-          name: `ticket-${interaction.user.username}`.toLowerCase().replace(/[^a-z0-9-]/g, '').slice(0, 80) || `ticket-${interaction.user.id}`,
-          type: ChannelType.GuildText,
-          parent: category?.id,
-          permissionOverwrites: [
-            { id: interaction.guild.roles.everyone.id, deny: [PermissionFlagsBits.ViewChannel] },
-            { id: interaction.user.id, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ReadMessageHistory] }
-          ]
-        });
+        const channel = await interaction.guild.channels.create({ name: `ticket-${interaction.user.username}`.toLowerCase().replace(/[^a-z0-9-]/g, '').slice(0, 70) || `ticket-${interaction.user.id}`, type: ChannelType.GuildText, permissionOverwrites: [{ id: interaction.guild.roles.everyone.id, deny: [PermissionFlagsBits.ViewChannel] }, { id: interaction.user.id, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ReadMessageHistory] }] });
         const ticket = await createTicket({ guildId: interaction.guild.id, channelId: channel.id, creatorId: interaction.user.id, type, subtype: type === 'alianza' ? 'alianza_partner' : null });
-        await addTicketEvent(ticket.id, interaction.user.id, 'created', type);
-        await writeLog({ guild: interaction.guild, category: 'ticket', action: 'create', actorId: interaction.user.id, channelId: channel.id, message: type });
+        await addTicketEvent(ticket.id, interaction.user.id, 'created', type); await writeLog({ guild: interaction.guild, category: 'ticket', action: 'create', actorId: interaction.user.id, channelId: channel.id, message: type });
         await channel.send({ content: `<@${interaction.user.id}>`, embeds: [{ color: 0, title: `HYPNOX STUDIOS — ${type === 'alianza' ? 'ALIANZA / PARTNER' : type.toUpperCase()}`, description: 'Describe tu solicitud con el mayor detalle posible. Un miembro del equipo te atenderá.' }] });
         return interaction.reply({ content: `Tu ticket fue creado: <#${channel.id}>`, ephemeral: true });
       }
       if (!interaction.isChatInputCommand()) return;
-      const command = client.commands.get(interaction.commandName);
-      if (!command) return;
+      const command = client.commands.get(interaction.commandName); if (!command) return;
       const guildType = interaction.guildId ? getGuildType(interaction.guildId) : null;
       if (!guildType || !(command.guilds || ['official', 'staff', 'applications']).includes(guildType)) return interaction.reply({ content: 'Este comando no está disponible en este servidor.', ephemeral: true });
       await command.execute(interaction, client);
     } catch (error) {
-      console.error(`[HYPNOX] Interaction error:`, error);
+      console.error('[HYPNOX] Interaction error:', error);
       const payload = { content: 'No se pudo completar la acción.', ephemeral: true };
       if (interaction.replied || interaction.deferred) await interaction.followUp(payload).catch(() => {}); else await interaction.reply(payload).catch(() => {});
     }
