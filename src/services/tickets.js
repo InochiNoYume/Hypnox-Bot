@@ -6,12 +6,15 @@ const TICKET_TYPE_DB = {
   soporte: 'support',
   reporte: 'report',
   alianza: 'alliance_partner',
-  contacto: 'contact'
+  contacto: 'contact',
+  bugs: 'bugs'
 };
+
+const VALID_TICKET_TYPES = ['support', 'report', 'alliance_partner', 'contact', 'bugs'];
 
 function normalizeTicketType(type) {
   const normalized = TICKET_TYPE_DB[type] || type;
-  if (!['support', 'report', 'alliance_partner', 'contact'].includes(normalized)) {
+  if (!VALID_TICKET_TYPES.includes(normalized)) {
     throw new Error('Tipo de ticket no válido');
   }
   return normalized;
