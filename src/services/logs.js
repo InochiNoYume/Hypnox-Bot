@@ -1,6 +1,6 @@
 const supabase = require('../database/supabase');
-const { EmbedBuilder } = require('discord.js');
 const { getGuildType, getGuildLogsChannelId } = require('../utils/guild');
+const { brandedEmbed } = require('../utils/embeds');
 
 async function writeLog({ guild, category, action, actorId, targetId = null, channelId = null, message = null, metadata = {} }) {
   const guildType = getGuildType(guild.id);
@@ -35,18 +35,18 @@ async function writeLog({ guild, category, action, actorId, targetId = null, cha
   if (logsChannelId) {
     const channel = await guild.channels.fetch(logsChannelId).catch(() => null);
     if (channel?.isTextBased()) {
-      const embed = new EmbedBuilder()
-        .setColor(0x000000)
-        .setTitle('HYPNOX STUDIOS — LOG')
-        .addFields(
-          { name: 'Categoría', value: category, inline: true },
-          { name: 'Acción', value: action, inline: true },
-          { name: 'Responsable', value: `<@${actorId}>`, inline: true }
-        )
-        .setTimestamp();
+      const embed = brandedEmbed('REGISTRO DEL SISTEMA', 'Actividad registrada por Hypnox Bot.', {
+        footerText: 'Hypnox Studios • Registro interno',
+        fields: [
+          { name: '◆ CATEGORÍA', value: String(category), inline: true },
+          { name: '◆ ACCIÓN', value: String(action), inline: true },
+          { name: '◆ RESPONSABLE', value: `<@${actorId}>`, inline: true }
+        ]
+      });
 
-      if (targetId) embed.addFields({ name: 'Objetivo', value: `<@${targetId}>`, inline: true });
-      if (message) embed.addFields({ name: 'Detalle', value: message.slice(0, 1024), inline: false });
+      if (targetId) embed.addFields({ name: '◆ OBJETIVO', value: `<@${targetId}>`, inline: true });
+      if (channelId) embed.addFields({ name: '◆ CANAL', value: `<#${channelId}>`, inline: true });
+      if (message) embed.addFields({ name: '◆ DETALLE', value: String(message).slice(0, 1024), inline: false });
       await channel.send({ embeds: [embed] }).catch(() => null);
     }
   }
