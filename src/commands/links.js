@@ -1,6 +1,14 @@
 const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
 const { getEnv } = require('../config/env');
 
+function readUrl(key) {
+  const value = getEnv(key);
+  if (!value) return null;
+  const url = String(value).trim();
+  if (!url) return null;
+  return /^https?:\/\//i.test(url) ? url : `https://${url}`;
+}
+
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('links')
@@ -8,16 +16,16 @@ module.exports = {
 
   async execute(interaction) {
     const links = [
-      ['Discord', getEnv('OFFICIAL_DISCORD_URL')],
-      ['Web', getEnv('WEBSITE_URL')],
-      ['YouTube', getEnv('YOUTUBE_URL')],
-      ['TikTok', getEnv('TIKTOK_URL')],
-      ['Instagram', getEnv('INSTAGRAM_URL')]
+      ['Discord', readUrl('OFFICIAL_DISCORD_URL')],
+      ['Web', readUrl('WEBSITE_URL')],
+      ['YouTube', readUrl('YOUTUBE_URL')],
+      ['TikTok', readUrl('TIKTOK_URL')],
+      ['Instagram', readUrl('INSTAGRAM_URL')]
     ].filter(([, url]) => url);
 
     const description = links.length
-      ? links.map(([name, url]) => `**${name}:** ${url}`).join('\n')
-      : 'Los enlaces oficiales todavía no están configurados.';
+      ? links.map(([name, url]) => `**${name}:** [Abrir enlace](${url})`).join('\n')
+      : 'No se encontraron enlaces oficiales configurados en el entorno del bot.';
 
     const embed = new EmbedBuilder()
       .setColor(Number.parseInt(process.env.BOT_COLOR || '000000', 16))
