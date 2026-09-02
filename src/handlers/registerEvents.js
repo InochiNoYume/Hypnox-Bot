@@ -12,7 +12,8 @@ const STAFF_ROLE_ENVS = [
   'OFFICIAL_ROLE_SRMOD_ID', 'OFFICIAL_ROLE_MOD_ID', 'OFFICIAL_ROLE_TMOD_ID', 'OFFICIAL_ROLE_HELPER_ID'
 ];
 
-function commandAccessAllowed(interaction, command) {
+function commandAccessAllowed(interaction, command, guildType) {
+  if (guildType === 'dev') return true;
   if (!command.access?.roleEnvs?.length) return true;
   return command.access.roleEnvs.some((roleEnv) => hasConfiguredRole(interaction.member, roleEnv));
 }
@@ -55,19 +56,24 @@ function registerEvents(client) {
         ];
 
         const channel = await interaction.guild.channels.create({ name: ticketChannelName(type, interaction.user.username, interaction.user.id), type: ChannelType.GuildText, parent: category.id, permissionOverwrites });
-        const ticket = await createTicket({ guildId: interaction.guild.id, channelId: channel.id, creator: interaction.user, type, subtype: type === 'alianza' ? 'alianza_partner' : null });
-        await addTicketEvent(ticket.id, interaction.user.id, 'created', type);
-        await writeLog({ guild: interaction.guild, category: 'ticket', action: 'create', actorId: interaction.user.id, channelId: channel.id, message: type });
-        await channel.send({ content: `<@${interaction.user.id}>`, embeds: [{ color: 0, title: `HYPNOX STUDIOS — ${type === 'alianza' ? 'ALIANZA / PARTNER' : type.toUpperCase()}`, description: 'Describe tu solicitud con el mayor detalle posible. Un miembro del equipo te atenderá.' }] });
-        return interaction.reply({ content: `Tu ticket fue creado: <#${channel.id}>`, ephemeral: true });
+        try {
+          const ticket = await createTicket({ guildId: interaction.guild.id, channelId: channel.id, creator: interaction.user, type, subtype: type === 'alianza' ? 'alianza_partner' : null });
+          await addTicketEvent(ticket.id, interaction.user.id, 'created', type);
+          await writeLog({ guild: interaction.guild, category: 'ticket', action: 'create', actorId: interaction.user.id, channelId: channel.id, message: type });
+          await channel.send({ content: `<@${interaction.user.id}>`, embeds: [{ color: 0, title: `HYPNOX STUDIOS — ${type === 'alianza' ? 'ALIANZA / PARTNER' : type.toUpperCase()}`, description: 'Describe tu solicitud con el mayor detalle posible. Un miembro del equipo te atenderá.' }] });
+          return interaction.reply({ content: `Tu ticket fue creado: <#${channel.id}>`, ephemeral: true });
+        } catch (error) {
+          await channel.delete().catch(() => {});
+          throw error;
+        }
       }
 
       if (!interaction.isChatInputCommand()) return;
       const command = client.commands.get(interaction.commandName);
       if (!command) return;
       const guildType = interaction.guildId ? getGuildType(interaction.guildId) : null;
-      if (!guildType || !(command.guilds || ['official', 'staff', 'applications']).includes(guildType)) return interaction.reply({ content: 'Este comando no está disponible en este servidor.', ephemeral: true });
-      if (!commandAccessAllowed(interaction, command)) return interaction.reply({ content: 'No tienes el rol necesario para usar este comando.', ephemeral: true });
+      if (!guildType || (guildType !== 'dev' && !(command.guilds || ['official', 'staff', 'applications']).includes(guildType))) return interaction.reply({ content: 'Este comando no está disponible en este servidor.', ephemeral: true });
+      if (!commandAccessAllowed(interaction, command, guildType)) return interaction.reply({ content: 'No tienes el rol necesario para usar este comando.', ephemeral: true });
       await command.execute(interaction, client);
     } catch (error) {
       console.error('[HYPNOX] Interaction error:', error);
