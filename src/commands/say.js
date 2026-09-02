@@ -1,5 +1,4 @@
 const { SlashCommandBuilder } = require('discord.js');
-const { hasConfiguredRole } = require('../utils/permissions');
 
 const MANAGEMENT_ROLES = [
   'OFFICIAL_ROLE_FOUNDER_ID', 'OFFICIAL_ROLE_DIRECTOR_ID', 'OFFICIAL_ROLE_ADMINISTRATOR_ID',
@@ -20,6 +19,11 @@ async function execute(interaction) {
   if (!message) return interaction.reply({ content: 'Debes indicar un mensaje.', ephemeral: true });
 
   await interaction.channel.send({ content: message, allowedMentions: { parse: [] } });
+
+  if (interaction.message) {
+    await interaction.message.delete().catch(() => {});
+    return;
+  }
 
   if (interaction.isChatInputCommand?.()) {
     await interaction.reply({ content: 'Mensaje publicado.', ephemeral: true });
