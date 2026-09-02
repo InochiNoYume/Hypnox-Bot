@@ -7,7 +7,8 @@ const { createWarning, getWarnings, deactivateWarning, createModerationAction } 
 const { writeLog } = require('../services/logs');
 
 const roleMap = {
-  helper: ['HELPER'], tmod: ['TMOD', 'MOD', 'SRMOD', 'ADMINISTRATOR', 'DIRECTOR', 'FOUNDER'],
+  helper: ['HELPER'],
+  tmod: ['TMOD', 'MOD', 'SRMOD', 'ADMINISTRATOR', 'DIRECTOR', 'FOUNDER'],
   mod: ['MOD', 'SRMOD', 'ADMINISTRATOR', 'DIRECTOR', 'FOUNDER'],
   srmod: ['SRMOD', 'ADMINISTRATOR', 'DIRECTOR', 'FOUNDER']
 };
@@ -15,7 +16,10 @@ const roleMap = {
 function allowed(member, level) {
   const type = getGuildType(member.guild.id);
   const prefix = type === 'staff' ? 'STAFF' : 'OFFICIAL';
-  return (roleMap[level] || []).some((role) => hasAnyRole(member, type, [`${prefix}_ROLE_${role}_ID`]));
+  return (roleMap[level] || []).some((role) => {
+    const roleName = type === 'staff' && role === 'ADMINISTRATOR' ? 'ADMINISTRATIVE_ASSISTANT' : role;
+    return hasAnyRole(member, type, [`${prefix}_ROLE_${roleName}_ID`]);
+  });
 }
 
 const command = new SlashCommandBuilder()
