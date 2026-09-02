@@ -43,7 +43,12 @@ async function execute(interaction) {
       const start = new Date(interaction.options.getString('inicio'));
       const endText = interaction.options.getString('fin');
       const end = endText ? new Date(endText) : null;
-      if (Number.isNaN(start.getTime()) || (end && Number.isNaN(end.getTime()))) return interaction.reply({ content: 'Fecha ISO inválida.', ephemeral: true });
+      if (Number.isNaN(start.getTime()) || (end && Number.isNaN(end.getTime()))) {
+        return interaction.reply({ content: 'Fecha ISO inválida.', ephemeral: true });
+      }
+      if (end && end <= start) {
+        return interaction.reply({ content: 'La fecha de finalización debe ser posterior a la fecha de inicio.', ephemeral: true });
+      }
 
       const { data: event, error } = await supabase.from('events').insert({
         guild_id: guild.id,
@@ -52,7 +57,7 @@ async function execute(interaction) {
         description: interaction.options.getString('descripcion'),
         starts_at: start.toISOString(),
         ends_at: end?.toISOString() || null,
-        status: 'scheduled',
+        status: 'upcoming',
         created_by_discord_user_id: interaction.user.id
       }).select().single();
       if (error) throw error;
@@ -78,6 +83,9 @@ async function execute(interaction) {
       const title = interaction.options.getString('titulo');
       const description = interaction.options.getString('descripcion');
       const startText = interaction.options.getString('inicio');
+      if (!title && !description && !startText) {
+        return interaction.reply({ content: 'Debes indicar al menos un campo para actualizar.', ephemeral: true });
+      }
       if (title) patch.title = title;
       if (description) patch.description = description;
       if (startText) {
@@ -86,7 +94,7 @@ async function execute(interaction) {
         patch.starts_at = start.toISOString();
       }
     } else {
-      patch.status = { cancelar: 'cancelled', iniciar: 'live', finalizar: 'finished' }[sub];
+      patch.status = { cancelar: 'cancelled', iniciar: 'active', finalizar: 'finished' }[sub];
     }
 
     const { data: updated, error } = await supabase.from('events').update(patch).eq('id', id).eq('guild_id', guild.id).select().single();
