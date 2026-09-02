@@ -2,6 +2,8 @@ const { SlashCommandBuilder } = require('discord.js');
 const supabase = require('../database/supabase');
 const { writeLog } = require('../services/logs');
 const { getGuildRow } = require('../services/guilds');
+const { brandedEmbed } = require('../utils/embeds');
+
 const STAFF_ROLES = [
   'OFFICIAL_ROLE_FOUNDER_ID', 'OFFICIAL_ROLE_DIRECTOR_ID', 'OFFICIAL_ROLE_ADMINISTRATOR_ID',
   'OFFICIAL_ROLE_SRMOD_ID', 'OFFICIAL_ROLE_MOD_ID', 'OFFICIAL_ROLE_TMOD_ID', 'OFFICIAL_ROLE_HELPER_ID',
@@ -9,28 +11,92 @@ const STAFF_ROLES = [
   'STAFF_ROLE_SRMOD_ID', 'STAFF_ROLE_MOD_ID', 'STAFF_ROLE_TMOD_ID', 'STAFF_ROLE_HELPER_ID',
   'STAFF_ROLE_PROJECT_MANAGER_ID', 'STAFF_ROLE_DEPARTMENT_LEAD_ID'
 ];
-const data = new SlashCommandBuilder().setName('evento').setDescription('Gestiona eventos')
-  .addSubcommand(s => s.setName('crear').setDescription('Crea un evento').addStringOption(o => o.setName('titulo').setDescription('Título').setRequired(true)).addStringOption(o => o.setName('descripcion').setDescription('Descripción').setRequired(true)).addStringOption(o => o.setName('inicio').setDescription('Fecha ISO').setRequired(true)).addStringOption(o => o.setName('fin').setDescription('Fecha ISO')))
-  .addSubcommand(s => s.setName('editar').setDescription('Edita un evento').addStringOption(o => o.setName('id').setDescription('ID').setRequired(true)).addStringOption(o => o.setName('titulo').setDescription('Título')).addStringOption(o => o.setName('descripcion').setDescription('Descripción')).addStringOption(o => o.setName('inicio').setDescription('Fecha ISO')))
-  .addSubcommand(s => s.setName('cancelar').setDescription('Cancela un evento').addStringOption(o => o.setName('id').setDescription('ID').setRequired(true)))
-  .addSubcommand(s => s.setName('iniciar').setDescription('Inicia un evento').addStringOption(o => o.setName('id').setDescription('ID').setRequired(true)))
-  .addSubcommand(s => s.setName('finalizar').setDescription('Finaliza un evento').addStringOption(o => o.setName('id').setDescription('ID').setRequired(true)));
-async function execute(i) {
-  const guild = await getGuildRow(i.guild.id); if (!guild) return i.reply({ content: 'Servidor no registrado.', ephemeral: true });
+
+const data = new SlashCommandBuilder()
+  .setName('evento')
+  .setDescription('Gestiona el ciclo de vida de los eventos de Hypnox Studios.')
+  .addSubcommand((sub) => sub.setName('crear').setDescription('Programa un nuevo evento.')
+    .addStringOption((option) => option.setName('titulo').setDescription('Título del evento.').setRequired(true))
+    .addStringOption((option) => option.setName('descripcion').setDescription('Descripción del evento.').setRequired(true))
+    .addStringOption((option) => option.setName('inicio').setDescription('Fecha y hora en formato ISO.').setRequired(true))
+    .addStringOption((option) => option.setName('fin').setDescription('Fecha y hora de finalización en formato ISO.')))
+  .addSubcommand((sub) => sub.setName('editar').setDescription('Actualiza un evento existente.')
+    .addStringOption((option) => option.setName('id').setDescription('ID del evento.').setRequired(true))
+    .addStringOption((option) => option.setName('titulo').setDescription('Nuevo título.'))
+    .addStringOption((option) => option.setName('descripcion').setDescription('Nueva descripción.'))
+    .addStringOption((option) => option.setName('inicio').setDescription('Nueva fecha de inicio en formato ISO.')))
+  .addSubcommand((sub) => sub.setName('cancelar').setDescription('Cancela un evento programado.')
+    .addStringOption((option) => option.setName('id').setDescription('ID del evento.').setRequired(true)))
+  .addSubcommand((sub) => sub.setName('iniciar').setDescription('Marca un evento como iniciado.')
+    .addStringOption((option) => option.setName('id').setDescription('ID del evento.').setRequired(true)))
+  .addSubcommand((sub) => sub.setName('finalizar').setDescription('Marca un evento como finalizado.')
+    .addStringOption((option) => option.setName('id').setDescription('ID del evento.').setRequired(true)));
+
+async function execute(interaction) {
+  const guild = await getGuildRow(interaction.guild.id);
+  if (!guild) return interaction.reply({ content: 'Servidor no registrado.', ephemeral: true });
+
   try {
-    const sub = i.options.getSubcommand();
+    const sub = interaction.options.getSubcommand();
+
     if (sub === 'crear') {
-      const start = new Date(i.options.getString('inicio')); const endText = i.options.getString('fin'); const end = endText ? new Date(endText) : null;
-      if (Number.isNaN(start.getTime()) || (end && Number.isNaN(end.getTime()))) return i.reply({ content: 'Fecha ISO inválida.', ephemeral: true });
-      const { data: event, error } = await supabase.from('events').insert({ guild_id: guild.id, channel_id: i.channel.id, title: i.options.getString('titulo'), description: i.options.getString('descripcion'), starts_at: start.toISOString(), ends_at: end?.toISOString() || null, status: 'scheduled', created_by_discord_user_id: i.user.id }).select().single(); if (error) throw error;
-      const msg = await i.channel.send({ embeds: [{ color: 0, title: 'HYPNOX STUDIOS — EVENTO', description: `${event.title}\n\n${event.description}\n\nInicio: <t:${Math.floor(start.getTime()/1000)}:F>` }] }); await supabase.from('events').update({ message_id: msg.id }).eq('id', event.id);
-      await writeLog({ guild: i.guild, category: 'event', action: 'create', actorId: i.user.id, channelId: i.channel.id, message: event.title, metadata: { eventId: event.id } }); return i.reply({ content: `Evento creado: \`${event.id}\``, ephemeral: true });
+      const start = new Date(interaction.options.getString('inicio'));
+      const endText = interaction.options.getString('fin');
+      const end = endText ? new Date(endText) : null;
+      if (Number.isNaN(start.getTime()) || (end && Number.isNaN(end.getTime()))) return interaction.reply({ content: 'Fecha ISO inválida.', ephemeral: true });
+
+      const { data: event, error } = await supabase.from('events').insert({
+        guild_id: guild.id,
+        channel_id: interaction.channel.id,
+        title: interaction.options.getString('titulo'),
+        description: interaction.options.getString('descripcion'),
+        starts_at: start.toISOString(),
+        ends_at: end?.toISOString() || null,
+        status: 'scheduled',
+        created_by_discord_user_id: interaction.user.id
+      }).select().single();
+      if (error) throw error;
+
+      const embed = brandedEmbed('EVENTO', event.description);
+      embed.addFields(
+        { name: 'TÍTULO', value: event.title, inline: false },
+        { name: 'INICIO', value: `<t:${Math.floor(start.getTime() / 1000)}:F>`, inline: true },
+        { name: 'ESTADO', value: 'Programado', inline: true }
+      );
+      if (end) embed.addFields({ name: 'FINALIZACIÓN', value: `<t:${Math.floor(end.getTime() / 1000)}:F>`, inline: true });
+      embed.setFooter({ text: 'Hypnox Studios • Gestión de eventos' });
+
+      const message = await interaction.channel.send({ embeds: [embed] });
+      await supabase.from('events').update({ message_id: message.id }).eq('id', event.id);
+      await writeLog({ guild: interaction.guild, category: 'event', action: 'create', actorId: interaction.user.id, channelId: interaction.channel.id, message: event.title, metadata: { eventId: event.id } });
+      return interaction.reply({ content: `Evento creado: \`${event.id}\``, ephemeral: true });
     }
-    const id = i.options.getString('id'); const patch = { updated_at: new Date().toISOString() };
-    if (sub === 'editar') { const t=i.options.getString('titulo'), d=i.options.getString('descripcion'), s=i.options.getString('inicio'); if(t)patch.title=t;if(d)patch.description=d;if(s){const dt=new Date(s);if(Number.isNaN(dt.getTime()))return i.reply({content:'Fecha ISO inválida.',ephemeral:true});patch.starts_at=dt.toISOString();} }
-    else patch.status = { cancelar: 'cancelled', iniciar: 'live', finalizar: 'finished' }[sub];
-    const { data: updated, error } = await supabase.from('events').update(patch).eq('id', id).eq('guild_id', guild.id).select().single(); if(error)throw error;
-    await writeLog({ guild: i.guild, category: 'event', action: sub, actorId: i.user.id, message: id }); return i.reply({ content: `Evento actualizado: ${updated.title}.`, ephemeral: true });
-  } catch(e){ console.error(e); return i.reply({content:'No se pudo gestionar el evento.',ephemeral:true}); }
+
+    const id = interaction.options.getString('id');
+    const patch = { updated_at: new Date().toISOString() };
+    if (sub === 'editar') {
+      const title = interaction.options.getString('titulo');
+      const description = interaction.options.getString('descripcion');
+      const startText = interaction.options.getString('inicio');
+      if (title) patch.title = title;
+      if (description) patch.description = description;
+      if (startText) {
+        const start = new Date(startText);
+        if (Number.isNaN(start.getTime())) return interaction.reply({ content: 'Fecha ISO inválida.', ephemeral: true });
+        patch.starts_at = start.toISOString();
+      }
+    } else {
+      patch.status = { cancelar: 'cancelled', iniciar: 'live', finalizar: 'finished' }[sub];
+    }
+
+    const { data: updated, error } = await supabase.from('events').update(patch).eq('id', id).eq('guild_id', guild.id).select().single();
+    if (error) throw error;
+    await writeLog({ guild: interaction.guild, category: 'event', action: sub, actorId: interaction.user.id, message: id });
+    return interaction.reply({ content: `Evento actualizado: ${updated.title}.`, ephemeral: true });
+  } catch (error) {
+    console.error(error);
+    return interaction.reply({ content: 'No se pudo gestionar el evento.', ephemeral: true });
+  }
 }
-module.exports={data,execute,guilds:['official','staff'],access:{roleEnvs:STAFF_ROLES}};
+
+module.exports = { data, execute, guilds: ['official', 'staff'], access: { roleEnvs: STAFF_ROLES } };
