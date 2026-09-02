@@ -4,6 +4,7 @@ function getGuildType(guildId) {
   if (guildId === config.guilds.official) return 'official';
   if (guildId === config.guilds.staff) return 'staff';
   if (guildId === config.guilds.applications) return 'applications';
+  if (config.guilds.dev && guildId === config.guilds.dev) return 'dev';
   return null;
 }
 
