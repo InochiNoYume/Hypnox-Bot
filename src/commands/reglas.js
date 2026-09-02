@@ -1,4 +1,5 @@
-const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
+const { SlashCommandBuilder } = require('discord.js');
+const { brandedEmbed } = require('../utils/embeds');
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -29,27 +30,26 @@ module.exports = {
       ['20', 'Sentido común', 'El Staff puede intervenir ante conductas perjudiciales aunque no estén descritas literalmente en una regla, siempre aplicando criterios razonables y proporcionales.']
     ];
 
-    const embed = new EmbedBuilder()
-      .setColor(0x000000)
-      .setTitle('HYPNOX STUDIOS — REGLAMENTO OFICIAL')
-      .setDescription('╭━━━━━━━━━━━━━━━━━━━━━━╮\n        **NORMAS DE LA COMUNIDAD**\n╰━━━━━━━━━━━━━━━━━━━━━━╯\n\nAl formar parte de Hypnox Studios aceptas respetar este reglamento y las normas aplicables de Discord. Estas reglas buscan mantener un espacio seguro, organizado y agradable para todos.')
-      .addFields(
-        ...rules.map(([number, title, description]) => ({
-          name: `『${number}』 ${title}`,
-          value: `↳ ${description}`,
-          inline: false
-        })),
-        {
-          name: '╭━━━━━━━━━━━━━━━━━━━━━━╮\n             MEDIDAS\n╰━━━━━━━━━━━━━━━━━━━━━━╯',
-          value: 'Las infracciones pueden resultar en advertencias, restricciones, timeout, expulsión o baneo, dependiendo de su gravedad, reincidencia y contexto. El Staff podrá aplicar medidas inmediatas cuando exista un riesgo para la comunidad.'
-        },
-        {
-          name: '╭━━━━━━━━━━━━━━━━━━━━━━╮\n             ACEPTACIÓN\n╰━━━━━━━━━━━━━━━━━━━━━━╯',
-          value: 'Al participar en este servidor confirmas que has leído y aceptado el reglamento de Hypnox Studios. El desconocimiento de las normas no exime de su cumplimiento.'
-        }
-      )
-      .setFooter({ text: 'Hypnox Studios • Reglamento oficial' })
-      .setTimestamp();
+    const embed = brandedEmbed('REGLAMENTO OFICIAL', 'Normas de convivencia de Hypnox Studios. El objetivo de este reglamento es mantener una comunidad segura, organizada y agradable para todos.', {
+      footerText: 'Hypnox Studios • Reglamento oficial'
+    });
+
+    embed.addFields(...rules.map(([number, title, description]) => ({
+      name: `『${number}』 ${title}`,
+      value: `↳ ${description}`,
+      inline: false
+    })));
+
+    embed.addFields(
+      {
+        name: '◆ MEDIDAS',
+        value: 'Las infracciones pueden resultar en advertencias, restricciones, timeout, expulsión o baneo, dependiendo de su gravedad, reincidencia y contexto. El Staff podrá aplicar medidas inmediatas cuando exista un riesgo para la comunidad.'
+      },
+      {
+        name: '◆ ACEPTACIÓN',
+        value: 'Al participar en este servidor confirmas que has leído y aceptado el reglamento de Hypnox Studios. El desconocimiento de las normas no exime de su cumplimiento.'
+      }
+    );
 
     return interaction.reply({ embeds: [embed] });
   },
