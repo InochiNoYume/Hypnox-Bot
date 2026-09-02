@@ -56,8 +56,10 @@ function registerAutoRoles(client) {
   client.on('guildMemberAdd', async (member) => {
     try {
       const guildType = getGuildType(member.guild.id);
+
       if (guildType === 'staff') {
         await assignAutoRole(member, 'STAFF_ROLE_TRAINEE_ID', 'Trainee');
+        await assignAutoRole(member, 'STAFF_ROLE_FORMACION_ID', 'Formación');
       } else if (guildType === 'applications') {
         await assignAutoRole(member, 'APPLICATIONS_ROLE_APPLICANT_ID', 'Applicant');
       }
