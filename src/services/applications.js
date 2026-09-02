@@ -1,9 +1,0 @@
-const supabase = require('../database/supabase');
-const { ensureUser } = require('./moderation');
-const { getGuildRow } = require('./guilds');
-function asUser(user){return typeof user==='object'?user:{id:user,username:'discord-user',globalName:'discord-user'};}
-async function activeApplication(guildId,user){const guild=await getGuildRow(guildId);if(!guild)return null;const u=await ensureUser(asUser(user));const {data,error}=await supabase.from('applications').select('*').eq('guild_id',guild.id).eq('applicant_user_id',u.id).order('submitted_at',{ascending:false}).limit(1).maybeSingle();if(error)throw error;return data;}
-async function createApplication(guildId,user,formResponse={}){const guild=await getGuildRow(guildId);if(!guild)throw new Error('Guild no registrada');const u=await ensureUser(asUser(user));const existing=await activeApplication(guildId,user);if(existing&&existing.cooldown_until&&new Date(existing.cooldown_until)>new Date())return {cooldown:existing.cooldown_until};const {data,error}=await supabase.from('applications').insert({guild_id:guild.id,applicant_user_id:u.id,phase:1,status:'submitted',form_response:formResponse,submitted_at:new Date().toISOString()}).select().single();if(error)throw error;return data;}
-async function updateApplication(id,patch){const {data,error}=await supabase.from('applications').update(patch).eq('id',id).select().single();if(error)throw error;return data;}
-async function createInterview(applicationId,interviewerId,scheduledAt){const {data,error}=await supabase.from('interviews').insert({application_id:applicationId,interviewer_discord_user_id:interviewerId,scheduled_at:scheduledAt,status:'scheduled'}).select().single();if(error)throw error;return data;}
-module.exports={activeApplication,createApplication,updateApplication,createInterview};
