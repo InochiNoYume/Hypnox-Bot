@@ -2,109 +2,73 @@ const { SlashCommandBuilder } = require('discord.js');
 const { getGuildType } = require('../utils/guild');
 const { hasAnyRole } = require('../utils/permissions');
 const { canModerate, canBotModerate } = require('../utils/moderation');
-const { createCase, getWarnings, deactivateCase } = require('../services/moderation');
+const { createWarning, getWarnings, deactivateWarning, createModerationAction } = require('../services/moderation');
 const { writeLog } = require('../services/logs');
 
-const roles = {
-  helper: ['OFFICIAL_ROLE_HELPER_ID', 'STAFF_ROLE_HELPER_ID'],
-  tmod: ['OFFICIAL_ROLE_TMOD_ID', 'STAFF_ROLE_TMOD_ID'],
-  mod: ['OFFICIAL_ROLE_MOD_ID', 'STAFF_ROLE_MOD_ID'],
-  srmod: ['OFFICIAL_ROLE_SRMOD_ID', 'STAFF_ROLE_SRMOD_ID'],
-  direction: ['OFFICIAL_ROLE_FOUNDER_ID', 'OFFICIAL_ROLE_DIRECTOR_ID', 'OFFICIAL_ROLE_ADMINISTRATOR_ID', 'STAFF_ROLE_FOUNDER_ID', 'STAFF_ROLE_DIRECTOR_ID', 'STAFF_ROLE_ADMINISTRATOR_ID']
+const roleMap = {
+  helper: ['HELPER'], tmod: ['TMOD', 'MOD', 'SRMOD', 'ADMINISTRATOR', 'DIRECTOR', 'FOUNDER'],
+  mod: ['MOD', 'SRMOD', 'ADMINISTRATOR', 'DIRECTOR', 'FOUNDER'],
+  srmod: ['SRMOD', 'ADMINISTRATOR', 'DIRECTOR', 'FOUNDER']
 };
-
 function allowed(member, level) {
-  const order = { helper: 1, tmod: 2, mod: 3, srmod: 4, direction: 5 };
-  const accepted = Object.entries(order).filter(([, value]) => value >= order[level]).flatMap(([key]) => roles[key]);
-  return hasAnyRole(member, getGuildType(member.guild.id), accepted);
+  const type = getGuildType(member.guild.id);
+  const prefix = type === 'staff' ? 'STAFF' : 'OFFICIAL';
+  return (roleMap[level] || []).some(role => hasAnyRole(member, type, [`${prefix}_ROLE_${role}_ID`]));
 }
+const command = new SlashCommandBuilder().setName('moderacion').setDescription('Herramientas de moderación')
+  .addSubcommand(s => s.setName('warn').setDescription('Advierte a un usuario').addUserOption(o => o.setName('usuario').setDescription('Usuario').setRequired(true)).addStringOption(o => o.setName('razon').setDescription('Razón')))
+  .addSubcommand(s => s.setName('warnings').setDescription('Consulta advertencias').addUserOption(o => o.setName('usuario').setDescription('Usuario').setRequired(true)))
+  .addSubcommand(s => s.setName('unwarn').setDescription('Desactiva una advertencia').addStringOption(o => o.setName('id').setDescription('ID de advertencia').setRequired(true)))
+  .addSubcommand(s => s.setName('timeout').setDescription('Aplica timeout').addUserOption(o => o.setName('usuario').setDescription('Usuario').setRequired(true)).addIntegerOption(o => o.setName('minutos').setDescription('Minutos').setMinValue(1).setMaxValue(40320).setRequired(true)).addStringOption(o => o.setName('razon').setDescription('Razón')))
+  .addSubcommand(s => s.setName('clear').setDescription('Elimina mensajes').addIntegerOption(o => o.setName('cantidad').setDescription('Cantidad').setMinValue(1).setMaxValue(100).setRequired(true)))
+  .addSubcommand(s => s.setName('slowmode').setDescription('Configura slowmode').addIntegerOption(o => o.setName('segundos').setDescription('Segundos').setMinValue(0).setMaxValue(21600).setRequired(true)))
+  .addSubcommand(s => s.setName('kick').setDescription('Expulsa un usuario').addUserOption(o => o.setName('usuario').setDescription('Usuario').setRequired(true)).addStringOption(o => o.setName('razon').setDescription('Razón')))
+  .addSubcommand(s => s.setName('ban').setDescription('Banea un usuario').addUserOption(o => o.setName('usuario').setDescription('Usuario').setRequired(true)).addStringOption(o => o.setName('razon').setDescription('Razón')));
 
-function base(name, description) {
-  return new SlashCommandBuilder().setName(name).setDescription(description);
-}
-
-const command = base('moderacion', 'Herramientas de moderación de Hypnox Studios')
-  .addSubcommand(s => s.setName('warn').setDescription('Advierte a un usuario').addUserOption(o => o.setName('usuario').setDescription('Usuario').setRequired(true)).addStringOption(o => o.setName('razon').setDescription('Razón').setRequired(false)))
-  .addSubcommand(s => s.setName('warnings').setDescription('Consulta las advertencias de un usuario').addUserOption(o => o.setName('usuario').setDescription('Usuario').setRequired(true)))
-  .addSubcommand(s => s.setName('unwarn').setDescription('Desactiva una advertencia').addStringOption(o => o.setName('id').setDescription('ID de la advertencia/caso').setRequired(true)))
-  .addSubcommand(s => s.setName('timeout').setDescription('Aplica un timeout').addUserOption(o => o.setName('usuario').setDescription('Usuario').setRequired(true)).addIntegerOption(o => o.setName('minutos').setDescription('Duración en minutos').setMinValue(1).setMaxValue(40320).setRequired(true)).addStringOption(o => o.setName('razon').setDescription('Razón')))
-  .addSubcommand(s => s.setName('clear').setDescription('Elimina mensajes recientes').addIntegerOption(o => o.setName('cantidad').setDescription('Cantidad de mensajes').setMinValue(1).setMaxValue(100).setRequired(true)))
-  .addSubcommand(s => s.setName('slowmode').setDescription('Configura el slowmode').addIntegerOption(o => o.setName('segundos').setDescription('Segundos, 0 para desactivar').setMinValue(0).setMaxValue(21600).setRequired(true)))
-  .addSubcommand(s => s.setName('kick').setDescription('Expulsa a un usuario').addUserOption(o => o.setName('usuario').setDescription('Usuario').setRequired(true)).addStringOption(o => o.setName('razon').setDescription('Razón')))
-  .addSubcommand(s => s.setName('ban').setDescription('Banea a un usuario').addUserOption(o => o.setName('usuario').setDescription('Usuario').setRequired(true)).addStringOption(o => o.setName('razon').setDescription('Razón')));
-
-async function execute(interaction) {
-  const sub = interaction.options.getSubcommand();
-  const required = { warn: 'helper', warnings: 'helper', unwarn: 'tmod', timeout: 'tmod', clear: 'tmod', slowmode: 'tmod', kick: 'mod', ban: 'srmod' }[sub];
-  if (!allowed(interaction.member, required)) return interaction.reply({ content: 'No tienes permisos para utilizar esta función.', ephemeral: true });
-
-  const guild = interaction.guild;
+async function execute(i) {
+  const sub = i.options.getSubcommand();
+  const level = { warn: 'helper', warnings: 'helper', unwarn: 'tmod', timeout: 'tmod', clear: 'tmod', slowmode: 'tmod', kick: 'mod', ban: 'srmod' }[sub];
+  if (!allowed(i.member, level)) return i.reply({ content: 'No tienes permisos para utilizar esta función.', ephemeral: true });
   try {
     if (sub === 'warnings') {
-      const user = interaction.options.getUser('usuario');
-      const rows = await getWarnings(guild.id, user.id);
+      const user = i.options.getUser('usuario'); const rows = await getWarnings(i.guild.id, user);
       const active = rows.filter(x => x.active);
-      return interaction.reply({ embeds: [{ color: 0x000000, title: 'HYPNOX STUDIOS — ADVERTENCIAS', description: `Usuario: <@${user.id}>\nAdvertencias activas: **${active.length}**\n\n${active.slice(0, 10).map(x => `\`${x.id}\` — ${x.reason || 'Sin razón'}`).join('\n') || 'No registra advertencias activas.'}` }] });
+      return i.reply({ embeds: [{ color: 0, title: 'HYPNOX STUDIOS — ADVERTENCIAS', description: `Usuario: <@${user.id}>\nActivas: **${active.length}**\n\n${active.slice(0, 10).map(x => `\`${x.id}\` — ${x.reason}`).join('\n') || 'No registra advertencias activas.'}` }] });
     }
-
     if (sub === 'unwarn') {
-      const id = interaction.options.getString('id');
-      await deactivateCase(guild.id, id, interaction.user.id);
-      await writeLog({ guild, category: 'moderation', action: 'unwarn', actorId: interaction.user.id, message: `Caso ${id} desactivado.` });
-      return interaction.reply({ embeds: [{ color: 0x000000, title: 'HYPNOX STUDIOS', description: 'La advertencia fue desactivada correctamente.' }] });
+      await deactivateWarning({ guildId: i.guild.id, warningId: i.options.getString('id') });
+      await writeLog({ guild: i.guild, category: 'moderation', action: 'unwarn', actorId: i.user.id, message: i.options.getString('id') });
+      return i.reply({ content: 'La advertencia fue desactivada.', ephemeral: true });
     }
-
     if (sub === 'clear') {
-      const amount = interaction.options.getInteger('cantidad');
-      const deleted = await interaction.channel.bulkDelete(amount, true);
-      await writeLog({ guild, category: 'moderation', action: 'clear', actorId: interaction.user.id, channelId: interaction.channel.id, message: `${deleted.size} mensajes eliminados.` });
-      return interaction.reply({ content: `Se eliminaron ${deleted.size} mensajes.`, ephemeral: true });
+      const deleted = await i.channel.bulkDelete(i.options.getInteger('cantidad'), true);
+      await writeLog({ guild: i.guild, category: 'moderation', action: 'clear', actorId: i.user.id, channelId: i.channel.id, message: `${deleted.size} mensajes eliminados.` });
+      return i.reply({ content: `Se eliminaron ${deleted.size} mensajes.`, ephemeral: true });
     }
-
     if (sub === 'slowmode') {
-      const seconds = interaction.options.getInteger('segundos');
-      await interaction.channel.setRateLimitPerUser(seconds);
-      await writeLog({ guild, category: 'moderation', action: 'slowmode', actorId: interaction.user.id, channelId: interaction.channel.id, message: `Slowmode configurado en ${seconds} segundos.` });
-      return interaction.reply({ embeds: [{ color: 0x000000, title: 'HYPNOX STUDIOS', description: `Slowmode configurado en **${seconds} segundos**.` }] });
+      const seconds = i.options.getInteger('segundos'); await i.channel.setRateLimitPerUser(seconds);
+      await writeLog({ guild: i.guild, category: 'moderation', action: 'slowmode', actorId: i.user.id, channelId: i.channel.id, message: `${seconds}s` });
+      return i.reply({ content: `Slowmode configurado en ${seconds} segundos.`, ephemeral: true });
     }
-
-    const user = interaction.options.getUser('usuario');
-    const member = await guild.members.fetch(user.id).catch(() => null);
-    const reason = interaction.options.getString('razon') || 'Sin razón especificada';
-    if (!member || !canModerate(interaction.member, member)) return interaction.reply({ content: 'No puedes moderar a ese usuario por jerarquía.', ephemeral: true });
-
+    const user = i.options.getUser('usuario'); const member = await i.guild.members.fetch(user.id).catch(() => null);
+    const reason = i.options.getString('razon') || 'Sin razón especificada';
+    if (!member || !canModerate(i.member, member)) return i.reply({ content: 'No puedes moderar a ese usuario por jerarquía.', ephemeral: true });
     if (sub === 'warn') {
-      const row = await createCase({ guildId: guild.id, targetId: user.id, moderatorId: interaction.user.id, type: 'warn', reason });
-      await writeLog({ guild, category: 'moderation', action: 'warn', actorId: interaction.user.id, targetId: user.id, message: reason, metadata: { caseId: row.id } });
-      return interaction.reply({ embeds: [{ color: 0x000000, title: 'HYPNOX STUDIOS — ADVERTENCIA', description: `Se registró una advertencia para <@${user.id}>.\n**Razón:** ${reason}` }] });
+      const row = await createWarning({ guildId: i.guild.id, target: user, moderator: i.user, reason });
+      await writeLog({ guild: i.guild, category: 'moderation', action: 'warn', actorId: i.user.id, targetId: user.id, message: reason, metadata: { warningId: row.id } });
+      return i.reply({ content: `Advertencia registrada para <@${user.id}>.`, ephemeral: true });
     }
-
-    if (!canBotModerate(member)) return interaction.reply({ content: 'El bot no puede aplicar esta acción debido a la jerarquía de roles.', ephemeral: true });
-
+    if (!canBotModerate(member)) return i.reply({ content: 'El bot no puede moderar a ese usuario por jerarquía.', ephemeral: true });
     if (sub === 'timeout') {
-      const minutes = interaction.options.getInteger('minutos');
-      await member.timeout(minutes * 60 * 1000, reason);
-      await createCase({ guildId: guild.id, targetId: user.id, moderatorId: interaction.user.id, type: 'timeout', reason, durationSeconds: minutes * 60 });
-      await writeLog({ guild, category: 'moderation', action: 'timeout', actorId: interaction.user.id, targetId: user.id, message: `${minutes} minutos — ${reason}` });
-      return interaction.reply({ embeds: [{ color: 0x000000, title: 'HYPNOX STUDIOS — TIMEOUT', description: `<@${user.id}> recibió un timeout de **${minutes} minutos**.` }] });
+      const minutes = i.options.getInteger('minutos'); await member.timeout(minutes * 60000, reason);
+      await createModerationAction({ guildId: i.guild.id, target: user, moderator: i.user, actionType: 'timeout', reason, durationSeconds: minutes * 60 });
+    } else if (sub === 'kick') {
+      await member.kick(reason); await createModerationAction({ guildId: i.guild.id, target: user, moderator: i.user, actionType: 'kick', reason });
+    } else {
+      await member.ban({ reason }); await createModerationAction({ guildId: i.guild.id, target: user, moderator: i.user, actionType: 'ban', reason });
     }
-
-    if (sub === 'kick') {
-      await member.kick(reason);
-      await createCase({ guildId: guild.id, targetId: user.id, moderatorId: interaction.user.id, type: 'kick', reason });
-      await writeLog({ guild, category: 'moderation', action: 'kick', actorId: interaction.user.id, targetId: user.id, message: reason });
-      return interaction.reply({ embeds: [{ color: 0x000000, title: 'HYPNOX STUDIOS — KICK', description: `<@${user.id}> fue expulsado.` }] });
-    }
-
-    await member.ban({ reason, deleteMessageSeconds: 0 });
-    await createCase({ guildId: guild.id, targetId: user.id, moderatorId: interaction.user.id, type: 'ban', reason });
-    await writeLog({ guild, category: 'moderation', action: 'ban', actorId: interaction.user.id, targetId: user.id, message: reason });
-    return interaction.reply({ embeds: [{ color: 0x000000, title: 'HYPNOX STUDIOS — BAN', description: `<@${user.id}> fue baneado.` }] });
-  } catch (error) {
-    console.error('Moderation error:', error);
-    if (interaction.replied || interaction.deferred) return interaction.followUp({ content: 'No se pudo completar la acción.', ephemeral: true });
-    return interaction.reply({ content: 'No se pudo completar la acción.', ephemeral: true });
-  }
+    await writeLog({ guild: i.guild, category: 'moderation', action: sub, actorId: i.user.id, targetId: user.id, message: reason });
+    return i.reply({ content: `Acción **${sub}** aplicada a <@${user.id}>.`, ephemeral: true });
+  } catch (error) { console.error(error); return i.reply({ content: 'No se pudo completar la acción.', ephemeral: true }); }
 }
-
-module.exports = { data: command, execute };
+module.exports = { data: command, execute, guilds: ['official', 'staff'] };
