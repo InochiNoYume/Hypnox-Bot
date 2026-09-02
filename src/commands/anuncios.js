@@ -3,7 +3,7 @@ const supabase = require('../database/supabase');
 const { writeLog } = require('../services/logs');
 const { getEnv } = require('../config/env');
 const { getGuildRow } = require('../services/guilds');
-const { brandedEmbed } = require('../utils/embeds');
+const { brandedEmbed, addSection } = require('../utils/embeds');
 
 const TYPES = {
   anuncio: {
@@ -35,7 +35,7 @@ const TYPES = {
 const STAFF_ROLES = [
   'OFFICIAL_ROLE_FOUNDER_ID', 'OFFICIAL_ROLE_DIRECTOR_ID', 'OFFICIAL_ROLE_ADMINISTRATOR_ID',
   'OFFICIAL_ROLE_SRMOD_ID', 'OFFICIAL_ROLE_MOD_ID', 'OFFICIAL_ROLE_TMOD_ID', 'OFFICIAL_ROLE_HELPER_ID',
-  'STAFF_ROLE_FOUNDER_ID', 'STAFF_ROLE_DIRECTOR_ID', 'STAFF_ROLE_ADMINISTRATOR_ID', 'STAFF_ROLE_ADMINISTRATIVE_ASSISTANT_ID',
+  'STAFF_ROLE_FOUNDER_ID', 'STAFF_ROLE_DIRECTOR_ID', 'STAFF_ROLE_ADMINISTRATIVE_ASSISTANT_ID',
   'STAFF_ROLE_SRMOD_ID', 'STAFF_ROLE_MOD_ID', 'STAFF_ROLE_TMOD_ID', 'STAFF_ROLE_HELPER_ID',
   'STAFF_ROLE_PROJECT_MANAGER_ID', 'STAFF_ROLE_DEPARTMENT_LEAD_ID'
 ];
@@ -70,12 +70,12 @@ async function execute(interaction) {
   const image = interaction.options.getString('imagen') || getEnv('OFFICIAL_IMAGE_ANNOUNCEMENT');
   const config = TYPES[type];
 
-  const embed = brandedEmbed(title, content, { image });
-  embed.addFields({
-    name: '◆ CLASIFICACIÓN',
-    value: `**${config.label}**\n${config.description}`,
-    inline: false
+  const embed = brandedEmbed(title, content, {
+    image,
+    footerText: `Hypnox Studios • ${config.label}`
   });
+
+  addSection(embed, 'Clasificación', `**${config.label}**\n${config.description}`);
 
   const message = await interaction.channel.send({ embeds: [embed] });
   const { error } = await supabase.from('announcements').insert({
