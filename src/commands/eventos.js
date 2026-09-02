@@ -1,7 +1,14 @@
-const { SlashCommandBuilder, PermissionFlagsBits } = require('discord.js');
+const { SlashCommandBuilder } = require('discord.js');
 const supabase = require('../database/supabase');
 const { writeLog } = require('../services/logs');
 const { getGuildRow } = require('../services/guilds');
+const STAFF_ROLES = [
+  'OFFICIAL_ROLE_FOUNDER_ID', 'OFFICIAL_ROLE_DIRECTOR_ID', 'OFFICIAL_ROLE_ADMINISTRATOR_ID',
+  'OFFICIAL_ROLE_SRMOD_ID', 'OFFICIAL_ROLE_MOD_ID', 'OFFICIAL_ROLE_TMOD_ID', 'OFFICIAL_ROLE_HELPER_ID',
+  'STAFF_ROLE_FOUNDER_ID', 'STAFF_ROLE_DIRECTOR_ID', 'STAFF_ROLE_ADMINISTRATOR_ID', 'STAFF_ROLE_ADMINISTRATIVE_ASSISTANT_ID',
+  'STAFF_ROLE_SRMOD_ID', 'STAFF_ROLE_MOD_ID', 'STAFF_ROLE_TMOD_ID', 'STAFF_ROLE_HELPER_ID',
+  'STAFF_ROLE_PROJECT_MANAGER_ID', 'STAFF_ROLE_DEPARTMENT_LEAD_ID'
+];
 const data = new SlashCommandBuilder().setName('evento').setDescription('Gestiona eventos')
   .addSubcommand(s => s.setName('crear').setDescription('Crea un evento').addStringOption(o => o.setName('titulo').setDescription('Título').setRequired(true)).addStringOption(o => o.setName('descripcion').setDescription('Descripción').setRequired(true)).addStringOption(o => o.setName('inicio').setDescription('Fecha ISO').setRequired(true)).addStringOption(o => o.setName('fin').setDescription('Fecha ISO')))
   .addSubcommand(s => s.setName('editar').setDescription('Edita un evento').addStringOption(o => o.setName('id').setDescription('ID').setRequired(true)).addStringOption(o => o.setName('titulo').setDescription('Título')).addStringOption(o => o.setName('descripcion').setDescription('Descripción')).addStringOption(o => o.setName('inicio').setDescription('Fecha ISO')))
@@ -9,7 +16,6 @@ const data = new SlashCommandBuilder().setName('evento').setDescription('Gestion
   .addSubcommand(s => s.setName('iniciar').setDescription('Inicia un evento').addStringOption(o => o.setName('id').setDescription('ID').setRequired(true)))
   .addSubcommand(s => s.setName('finalizar').setDescription('Finaliza un evento').addStringOption(o => o.setName('id').setDescription('ID').setRequired(true)));
 async function execute(i) {
-  if (!i.member.permissions.has(PermissionFlagsBits.ManageGuild)) return i.reply({ content: 'No tienes permisos.', ephemeral: true });
   const guild = await getGuildRow(i.guild.id); if (!guild) return i.reply({ content: 'Servidor no registrado.', ephemeral: true });
   try {
     const sub = i.options.getSubcommand();
@@ -27,4 +33,4 @@ async function execute(i) {
     await writeLog({ guild: i.guild, category: 'event', action: sub, actorId: i.user.id, message: id }); return i.reply({ content: `Evento actualizado: ${updated.title}.`, ephemeral: true });
   } catch(e){ console.error(e); return i.reply({content:'No se pudo gestionar el evento.',ephemeral:true}); }
 }
-module.exports={data,execute,guilds:['official','staff']};
+module.exports={data,execute,guilds:['official','staff'],access:{roleEnvs:STAFF_ROLES}};
