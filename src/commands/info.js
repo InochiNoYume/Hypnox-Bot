@@ -18,5 +18,8 @@ module.exports = {
     );
 
     await interaction.reply({ embeds: [embed] });
-  }
+  },
+
+  guilds: ['official'],
+  access: { roleEnvs: ['OFFICIAL_ROLE_MEMBER_ID'] }
 };
