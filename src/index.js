@@ -7,6 +7,8 @@ const supabase = require('./database/supabase');
 const loadCommands = require('./handlers/loadCommands');
 const registerEvents = require('./handlers/registerEvents');
 const registerPrefix = require('./handlers/registerPrefix');
+const { registerWelcome } = require('./handlers/registerWelcome');
+const { configurePresence } = require('./utils/presence');
 
 async function registerSlashCommands(client) {
   const commands = [...client.commands.values()];
@@ -85,6 +87,8 @@ async function bootstrap() {
   registerEvents(client);
   registerPrefix(client);
   registerAutoRoles(client);
+  registerWelcome(client);
+  configurePresence(client);
 
   client.once('clientReady', async () => {
     console.log(`[HYPNOX] Conectado como ${client.user.tag}`);
