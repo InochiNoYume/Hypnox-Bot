@@ -4,7 +4,7 @@ const { hasConfiguredRole } = require('./permissions');
 const { brandedEmbed } = require('./embeds');
 
 const ADMIN_ROLES = {
-  staff: ['STAFF_ROLE_FOUNDER_ID', 'STAFF_ROLE_DIRECTOR_ID', 'STAFF_ROLE_ADMINISTRATOR_ID'],
+  staff: ['STAFF_ROLE_FOUNDER_ID', 'STAFF_ROLE_DIRECTOR_ID', 'STAFF_ROLE_ADMINISTRATIVE_ASSISTANT_ID'],
   applications: ['APPLICATIONS_ROLE_FOUNDER_ID', 'APPLICATIONS_ROLE_DIRECTOR_ID', 'APPLICATIONS_ROLE_ADMINISTRATOR_ID']
 };
 
@@ -40,7 +40,10 @@ async function getConfiguredChannel(interaction, key) {
 }
 
 function accessDenied() {
-  return 'Solo Founder, Director y Administrator pueden utilizar este comando.';
+  const guildType = getGuildType();
+  return guildType === 'staff'
+    ? 'Solo Founder, Director y Administrative Assistant pueden utilizar este comando.'
+    : 'Solo Founder, Director y Administrator pueden utilizar este comando.';
 }
 
 function missingChannel(envKey) {
