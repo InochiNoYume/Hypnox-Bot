@@ -70,10 +70,18 @@ async function execute(i){
   if(!canHandleTicket(i,ticket))return i.reply({content:'No tienes permiso para gestionar este tipo de ticket.',ephemeral:true});
   if(sub==='claim'){
     if(ticket.assigned_to_discord_user_id)return i.reply({content:`Este ticket ya fue reclamado por <@${ticket.assigned_to_discord_user_id}>.`,ephemeral:true});
-    await updateTicket(ticket.id,{assigned_to_discord_user_id:i.user.id});
+    try {
+      await updateTicket(ticket.id,{assigned_to_discord_user_id:i.user.id});
+    } catch (error) {
+      if (error?.message === 'TICKET_ALREADY_ASSIGNED' || error?.code === 'P0001') {
+        const current = await getTicket(i.channel.id).catch(() => null);
+        if (current?.assigned_to_discord_user_id) return i.reply({content:`Este ticket ya fue reclamado por <@${current.assigned_to_discord_user_id}>.`,ephemeral:true});
+      }
+      throw error;
+    }
     await hideStaffFromTicket(i.channel,i.user.id);
     if(creatorDiscordId)await i.channel.permissionOverwrites.edit(creatorDiscordId,{ViewChannel:true,SendMessages:true,ReadMessageHistory:true});
-    await addTicketEvent(ticket.id,i.user.id,'assigned');
+    await addTicketEvent(ticket.id,i.user.id,'assigned').catch((error)=>console.error('[HYPNOX] No se pudo registrar asignación de ticket:',error?.message||error));
     await writeLog({guild:i.guild,category:'ticket',action:'claim',actorId:i.user.id,channelId:i.channel.id});
     return i.reply({content:`Ticket reclamado por <@${i.user.id}>.`});
   }
@@ -81,11 +89,13 @@ async function execute(i){
   const user=i.options.getUser('usuario');
   if(sub==='add'){
     await i.channel.permissionOverwrites.edit(user.id,{ViewChannel:true,SendMessages:true,ReadMessageHistory:true});
-    await addTicketEvent(ticket.id,i.user.id,'message',`Usuario añadido: ${user.id}`);
+    await addTicketEvent(ticket.id,i.user.id,'message',`Usuario añadido: ${user.id}`).catch((error)=>console.error('[HYPNOX] No se pudo registrar usuario añadido:',error?.message||error));
+    await writeLog({guild:i.guild,category:'ticket',action:'add_member',actorId:i.user.id,targetId:user.id,channelId:i.channel.id});
     return i.reply({content:`Se añadió a <@${user.id}>.`});
   }
   await i.channel.permissionOverwrites.delete(user.id).catch(()=>{});
-  await addTicketEvent(ticket.id,i.user.id,'message',`Usuario retirado: ${user.id}`);
+  await addTicketEvent(ticket.id,i.user.id,'message',`Usuario retirado: ${user.id}`).catch((error)=>console.error('[HYPNOX] No se pudo registrar usuario retirado:',error?.message||error));
+  await writeLog({guild:i.guild,category:'ticket',action:'remove_member',actorId:i.user.id,targetId:user.id,channelId:i.channel.id});
   return i.reply({content:`Se retiró a <@${user.id}>.`});
 }
 module.exports={data,execute,select,labels,guilds:['official']};
