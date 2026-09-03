@@ -3,6 +3,7 @@ require('dotenv').config();
 const { Client, GatewayIntentBits, Collection, REST, Routes } = require('discord.js');
 const { validateEnv, getEnv } = require('./config/env');
 const { getGuildType } = require('./utils/guild');
+const { validateCommands } = require('./utils/validateCommands');
 const supabase = require('./database/supabase');
 const loadCommands = require('./handlers/loadCommands');
 const registerEvents = require('./handlers/registerEvents');
@@ -10,16 +11,27 @@ const registerPrefix = require('./handlers/registerPrefix');
 const { registerWelcome } = require('./handlers/registerWelcome');
 const { configurePresence } = require('./utils/presence');
 
-async function registerSlashCommands(client) {
-  const commands = [...client.commands.values()];
-  const guilds = [
+function getConfiguredGuilds() {
+  return [
     ['official', getEnv('OFFICIAL_GUILD_ID')],
     ['staff', getEnv('STAFF_GUILD_ID')],
     ['applications', getEnv('APPLICATIONS_GUILD_ID')],
     ['dev', getEnv('DISCORD_DEV_GUILD_ID') || getEnv('DEV_GUILD_ID')]
   ].filter(([, guildId]) => guildId);
+}
 
+async function registerSlashCommands(client) {
+  const commands = [...client.commands.values()];
+  const commandErrors = validateCommands(client.commands);
+  if (commandErrors.length) {
+    throw new Error(`Definiciones de comandos inválidas: ${commandErrors.join(' | ')}`);
+  }
+
+  const guilds = getConfiguredGuilds();
   const rest = new REST({ version: '10' }).setToken(getEnv('DISCORD_TOKEN'));
+  let failures = 0;
+
+  console.log(`[HYPNOX] Verificando registro de slash commands en ${guilds.length} guild(s)...`);
 
   for (const [guildType, guildId] of guilds) {
     const body = commands
@@ -27,15 +39,43 @@ async function registerSlashCommands(client) {
       .map((command) => command.data.toJSON());
 
     try {
-      await rest.put(
+      const guild = await client.guilds.fetch(guildId);
+      console.log(`[HYPNOX] Guild ${guildType}: ${guild.name} (${guild.id}) — acceso OK.`);
+
+      const registered = await rest.put(
         Routes.applicationGuildCommands(getEnv('DISCORD_CLIENT_ID'), guildId),
         { body }
       );
-      console.log(`[HYPNOX] Slash commands registrados en ${guildType}: ${body.length}`);
+
+      const registeredCount = Array.isArray(registered) ? registered.length : 0;
+      if (registeredCount !== body.length) {
+        failures += 1;
+        console.error(`[HYPNOX] Guild ${guildType}: registro incompleto. Esperados ${body.length}, Discord devolvió ${registeredCount}.`);
+        continue;
+      }
+
+      const registeredNames = new Set(registered.map((command) => command.name));
+      const missing = body.map((command) => command.name).filter((name) => !registeredNames.has(name));
+      if (missing.length) {
+        failures += 1;
+        console.error(`[HYPNOX] Guild ${guildType}: faltan comandos después del registro: ${missing.join(', ')}.`);
+        continue;
+      }
+
+      console.log(`[HYPNOX] Guild ${guildType}: ${registeredCount} slash commands registrados y verificados.`);
     } catch (error) {
-      console.error(`[HYPNOX] No se pudieron registrar slash commands en ${guildType} (${guildId}): ${error.message}`);
+      failures += 1;
+      console.error(`[HYPNOX] Guild ${guildType} (${guildId}): error registrando comandos: ${error.message}`);
     }
   }
+
+  if (failures) {
+    console.error(`[HYPNOX] Registro de slash commands finalizado con ${failures} guild(s) con errores.`);
+  } else {
+    console.log('[HYPNOX] Registro de slash commands completado correctamente en todas las guilds configuradas.');
+  }
+
+  return { guilds: guilds.length, failures };
 }
 
 async function assignAutoRole(member, roleEnv, label) {
@@ -84,6 +124,13 @@ async function bootstrap() {
 
   client.commands = new Collection();
   loadCommands(client);
+
+  const commandErrors = validateCommands(client.commands);
+  if (commandErrors.length) {
+    throw new Error(`Comandos inválidos: ${commandErrors.join(' | ')}`);
+  }
+  console.log(`[HYPNOX] Validación de comandos OK: ${client.commands.size} comandos.`);
+
   registerEvents(client);
   registerPrefix(client);
   registerAutoRoles(client);
@@ -91,7 +138,7 @@ async function bootstrap() {
   configurePresence(client);
 
   client.once('clientReady', async () => {
-    console.log(`[HYPNOX] Conectado como ${client.user.tag}`);
+    console.log(`[HYPNOX] Conectado como ${client.user.tag} (${client.user.id})`);
 
     await registerSlashCommands(client);
 
