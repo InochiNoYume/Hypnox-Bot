@@ -1,35 +1,94 @@
 # Hypnox Bot
 
-Bot de Discord de Hypnox Studios, construido con Node.js, discord.js y Supabase.
+Bot central de **Hypnox Studios** para los servidores de Discord, desarrollado con Node.js, JavaScript, discord.js y Supabase.
+
+## Servidores
+
+- **Official Discord:** comunidad pública, contenido, series, eventos, premios, soporte, alianzas y postulaciones.
+- **Staff Team Discord:** moderación, proyectos, departamentos y coordinación interna. No utiliza tickets.
+- **Staff Applications Discord:** espacio destinado al proceso de postulación. No utiliza formularios, entrevistas ni tickets.
+- **Development Discord:** servidor técnico para pruebas y desarrollo. Recibe el conjunto de comandos de los demás servidores para validar cambios.
 
 ## Arquitectura
 
-El bot funciona como una única aplicación backend para los servidores de Hypnox Studios. La configuración sensible y todos los identificadores de Discord se mantienen mediante variables de entorno.
+El bot utiliza una única aplicación de Discord y una única base de datos de Supabase para centralizar la información de los servidores.
 
-Los servidores soportados son:
+- Los servidores, roles y canales se identifican mediante IDs configurados en `.env`.
+- Las respuestas y embeds utilizan una identidad visual negra (`#000000`) y no dependen de nombres de roles.
+- Los registros se almacenan en Supabase y cada servidor utiliza un único canal de logs configurado.
+- `DISCORD_TOKEN` y `SUPABASE_SERVICE_ROLE_KEY` nunca deben publicarse.
+- No existe una aplicación web dependiente del bot.
 
-- `official`: servidor oficial de Hypnox Studios.
-- `staff`: servidor interno del Staff Team.
-- `applications`: servidor de postulaciones.
-- `dev`: servidor de desarrollo y pruebas. Recibe el conjunto de comandos de todos los demás servidores para validar cambios antes de producción.
+## Autoroles
 
-Los comandos normales se registran exclusivamente en los servidores declarados en cada comando. No existe un registro global intencional.
+El bot asigna automáticamente un rol cuando un usuario entra a los servidores correspondientes:
 
-## Comandos
+- **Staff Team Discord:** asigna `STAFF_ROLE_TRAINEE_ID` → **Trainee**.
+- **Staff Applications Discord:** asigna `APPLICATIONS_ROLE_APPLICANT_ID` → **Applicant**.
 
-El bot carga automáticamente los módulos de `src/commands/`.
+El sistema utiliza el evento `guildMemberAdd` y requiere el intent **Guild Members** y que el bot tenga permiso para gestionar los roles. El rol que se asigna debe estar por debajo del rol máximo del bot en la jerarquía de Discord.
 
-Cada comando debe exportar:
+Los autoroles solo se asignan al momento de entrada. Cambiar una variable de entorno no aplica retroactivamente el rol a miembros que ya estaban dentro del servidor.
 
-```js
-module.exports = {
-  data,
-  execute,
-  guilds: ['official']
-};
-```
+## Postulaciones
 
-`guilds` es obligatorio y solo admite `official`, `staff` y `applications`. El servidor `dev` es especial: durante el registro recibe todos los comandos para realizar pruebas.
+El flujo actual es deliberadamente simple:
+
+1. `/abierto` abre la convocatoria y publica el enlace al Discord de postulaciones.
+2. Los candidatos realizan su postulación mediante el proceso definido para la convocatoria.
+3. El equipo revisa y evalúa las postulaciones.
+4. `/cerrado` cierra la convocatoria.
+5. `/aceptado @usuario1 ...` publica oficialmente a los usuarios aceptados.
+
+No se utilizan formularios, entrevistas ni tickets para este proceso. La documentación del proceso se publica mediante `/faq-postulaciones` y `/proceso-seleccion` en el servidor de Applications.
+
+## Tickets
+
+El sistema de tickets funciona **únicamente en Official Discord** mediante un panel único, selector de categoría y formulario modal antes de crear el canal.
+
+### Categorías y acceso
+
+| Categoría | Acceso |
+|---|---|
+| Soporte | Helper en adelante |
+| Reporte | T-Mod en adelante |
+| Alianza / Partner | Helper en adelante |
+| Contacto | Administrator, Director y Founder |
+| Bugs / Errores | Developer, Producer, Administrator, Director y Founder |
+
+Los permisos se resuelven mediante IDs de roles configurados en las variables de entorno.
+
+Al reclamar un ticket, el resto de los roles de atención pierde el acceso al canal y se conserva el acceso del creador y del miembro que lo reclamó. Los usuarios con permiso de Administrador de Discord pueden seguir accediendo porque Discord permite que `Administrator` omita los overwrites de canales.
+
+La categoría **Bugs / Errores** registra específicamente los fallos técnicos y está disponible para Developer y Producer, además de Dirección y Administración.
+
+### Formularios
+
+- **Soporte:** asunto, problema, detalles y evidencia opcional.
+- **Reporte:** usuario reportado, motivo, descripción y evidencia opcional.
+- **Alianza / Partner:** tipo, servidor/comunidad, propuesta, miembros y contacto.
+- **Contacto:** asunto, motivo, detalles y evidencia opcional.
+- **Bugs / Errores:** asunto, descripción, pasos para reproducir y evidencia opcional.
+
+Los valores de interfaz se normalizan antes de guardarse en Supabase. La base de datos acepta actualmente `support`, `report`, `alliance_partner`, `contact` y `bugs`.
+
+## Módulos
+
+- **Información:** help, reglas, links e información general.
+- **Moderación:** warn, warnings, unwarn, timeout, clear, slowmode, kick y ban.
+- **Tickets:** panel, formularios, creación, claim, cierre, adición y retirada de usuarios.
+- **Anuncios:** publicaciones oficiales con embed negro e imagen configurable.
+- **Eventos:** crear, editar, cancelar, iniciar y finalizar.
+- **Premios:** sorteos, participación, finalización, reroll y registro de entrega.
+- **Proyectos:** creación, edición, estado, cierre y asignación de manager.
+- **Postulaciones:** apertura, cierre, resultados, requisitos, FAQ y documentación del proceso.
+- **Autoroles:** asignación automática de Trainee en Staff Team y Applicant en Staff Applications.
+- **Administración:** configuración, canales, roles, permisos, mantenimiento y recarga.
+- **Logs:** un canal de logs por servidor y persistencia en Supabase.
+
+## Ayuda
+
+`/help inicio` muestra las categorías disponibles. La disponibilidad de las funciones se filtra mediante los IDs de roles configurados para cada servidor.
 
 ## Configuración
 
