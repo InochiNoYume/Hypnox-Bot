@@ -1,21 +1,77 @@
 require('dotenv').config();
 
-const fs = require('node:fs');
-const path = require('node:path');
 const { REST, Routes } = require('discord.js');
 const { validateEnv, getGuildIds, getEnv } = require('./config/env');
+const { validateCommands } = require('./utils/validateCommands');
+const loadCommands = require('./handlers/loadCommands');
+
+const REQUEST_TIMEOUT_MS = 15_000;
+const MAX_ATTEMPTS = 3;
+
+function withTimeout(promise, timeoutMs, message) {
+  let timer;
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => {
+      timer = setTimeout(() => reject(new Error(message)), timeoutMs);
+    })
+  ]).finally(() => clearTimeout(timer));
+}
 
 function loadCommandData() {
-  const commandsPath = path.join(__dirname, 'commands');
-  const files = fs.readdirSync(commandsPath).filter((file) => file.endsWith('.js'));
+  const client = { commands: new Map() };
+  loadCommands(client);
 
-  return files
-    .map((file) => require(path.join(commandsPath, file)))
-    .filter((command) => command?.data?.name)
-    .map((command) => ({
-      data: command.data,
-      guilds: command.guilds || ['official', 'staff', 'applications']
-    }));
+  const commandErrors = validateCommands(client.commands);
+  if (commandErrors.length) {
+    throw new Error(`Definiciones de comandos inválidas: ${commandErrors.join(' | ')}`);
+  }
+
+  return [...client.commands.values()].map((command) => ({
+    data: command.data,
+    guilds: [...command.guilds]
+  }));
+}
+
+function normalize(value) {
+  if (Array.isArray(value)) return value.map(normalize);
+  if (value && typeof value === 'object') {
+    return Object.fromEntries(Object.entries(value).sort(([a], [b]) => a.localeCompare(b)).map(([key, val]) => [key, normalize(val)]));
+  }
+  return value;
+}
+
+function commandsEqual(expected, registered) {
+  return JSON.stringify(normalize(expected)) === JSON.stringify(normalize(registered));
+}
+
+function expectedForGuild(commands, guildType) {
+  return commands
+    .filter((command) => guildType === 'dev' || command.guilds.includes(guildType))
+    .map((command) => command.data.toJSON());
+}
+
+async function requestWithRetry(request, label) {
+  let lastError;
+
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt += 1) {
+    try {
+      return await withTimeout(request(), REQUEST_TIMEOUT_MS, `${label}: Discord REST no respondió en ${REQUEST_TIMEOUT_MS / 1000}s.`);
+    } catch (error) {
+      lastError = error;
+      const status = Number(error?.status || error?.httpStatus || 0);
+      const retryable = status === 429 || status >= 500 || !status;
+      if (!retryable || attempt === MAX_ATTEMPTS) break;
+      const delay = Math.min(1000 * 2 ** (attempt - 1), 4000);
+      console.warn(`[HYPNOX][COMMANDS] ${label}: intento ${attempt}/${MAX_ATTEMPTS} falló; reintentando en ${delay}ms.`);
+      await new Promise((resolve) => setTimeout(resolve, delay));
+    }
+  }
+
+  const status = lastError?.status ? ` [HTTP ${lastError.status}]` : '';
+  const code = lastError?.code ? ` [Discord ${lastError.code}]` : '';
+  const apiMessage = lastError?.rawError?.message || lastError?.message || String(lastError);
+  throw new Error(`${label}${status}${code}: ${apiMessage}`);
 }
 
 async function deploy() {
@@ -28,24 +84,35 @@ async function deploy() {
   for (const [guildType, guildId] of Object.entries(guildIds)) {
     if (!guildId) continue;
 
-    const body = commands
-      .filter((command) => guildType === 'dev' || command.guilds.includes(guildType))
-      .map((command) => command.data.toJSON());
+    const body = expectedForGuild(commands, guildType);
+    if (guildType !== 'dev' && body.length === 0) {
+      throw new Error(`No hay comandos configurados para la guild ${guildType}.`);
+    }
 
-    await rest.put(
-      Routes.applicationGuildCommands(getEnv('DISCORD_CLIENT_ID'), guildId),
-      { body }
+    const registered = await requestWithRetry(
+      () => rest.get(Routes.applicationGuildCommands(getEnv('DISCORD_CLIENT_ID'), guildId)),
+      `${guildType} GET`
     );
 
-    console.log(`[HYPNOX] Comandos registrados en ${guildType}: ${body.length}`);
+    if (commandsEqual(body, registered || [])) {
+      console.log(`[HYPNOX][COMMANDS] ${guildType}: ya está sincronizado (${body.length}).`);
+      continue;
+    }
+
+    const updated = await requestWithRetry(
+      () => rest.put(Routes.applicationGuildCommands(getEnv('DISCORD_CLIENT_ID'), guildId), { body }),
+      `${guildType} PUT`
+    );
+
+    console.log(`[HYPNOX][COMMANDS] ${guildType}: comandos registrados (${Array.isArray(updated) ? updated.length : body.length}).`);
   }
 }
 
 if (require.main === module) {
   deploy().catch((error) => {
-    console.error('[HYPNOX] Error registrando comandos:', error);
+    console.error('[HYPNOX][COMMANDS] Error registrando comandos:', error.message);
     process.exit(1);
   });
 }
 
-module.exports = { deploy, loadCommandData };
+module.exports = { deploy, loadCommandData, expectedForGuild, commandsEqual };
