@@ -7,6 +7,7 @@ const loadCommands = require('./handlers/loadCommands');
 
 const REQUEST_TIMEOUT_MS = 15_000;
 const MAX_ATTEMPTS = 3;
+const DISCORD_RUNTIME_FIELDS = new Set(['id', 'application_id', 'guild_id', 'version']);
 
 function withTimeout(promise, timeoutMs, message) {
   let timer;
@@ -38,7 +39,7 @@ function normalize(value) {
   if (value && typeof value === 'object') {
     return Object.fromEntries(
       Object.entries(value)
-        .filter(([key]) => !['id', 'application_id', 'guild_id', 'version'].includes(key))
+        .filter(([key]) => !DISCORD_RUNTIME_FIELDS.has(key))
         .sort(([a], [b]) => a.localeCompare(b))
         .map(([key, val]) => [key, normalize(val)])
     );
@@ -46,8 +47,20 @@ function normalize(value) {
   return value;
 }
 
+function commandMap(commands) {
+  return new Map((commands || []).map((command) => [command.name, normalize(command)]));
+}
+
 function commandsEqual(expected, registered) {
-  return JSON.stringify(normalize(expected)) === JSON.stringify(normalize(registered));
+  const expectedMap = commandMap(expected);
+  const registeredMap = commandMap(registered);
+  if (expectedMap.size !== registeredMap.size) return false;
+
+  for (const [name, command] of expectedMap) {
+    if (!registeredMap.has(name)) return false;
+    if (JSON.stringify(command) !== JSON.stringify(registeredMap.get(name))) return false;
+  }
+  return true;
 }
 
 function expectedForGuild(commands, guildType) {
