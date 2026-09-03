@@ -25,7 +25,7 @@ const select = () => new ActionRowBuilder().addComponents(new StringSelectMenuBu
 function isStaff(i){return STAFF_ROLE_ENVS.some((env)=>hasConfiguredRole(i.member,env));}
 
 async function hideStaffFromTicket(channel, claimedUserId){
-  for(const env of STAFF_ROLE_ENVS){const roleId=getEnv(env);if(!roleId)continue;await channel.permissionOverwrites.edit(roleId,{ViewChannel:false,SendMessages:false,ReadMessageHistory:false}).catch(()=>{});}
+  for(const env of STAFF_ROLE_ENVS){const roleId=getEnv(env);if(!roleId || !channel.guild.roles.cache.has(roleId))continue;await channel.permissionOverwrites.edit(roleId,{ViewChannel:false,SendMessages:false,ReadMessageHistory:false}).catch(()=>{});}
   if(claimedUserId)await channel.permissionOverwrites.edit(claimedUserId,{ViewChannel:true,SendMessages:true,ReadMessageHistory:true});
 }
 
@@ -47,7 +47,7 @@ async function execute(i){
       '> Selecciona únicamente el motivo que corresponda a tu solicitud.','> Explica tu situación de forma clara y proporciona los datos necesarios.','> En Bugs / Errores, incluye pasos para reproducir el problema y evidencia cuando sea posible.','> No abras múltiples tickets para el mismo asunto.','> Mantén una comunicación respetuosa durante toda la atención.','',
       'Una vez creado el ticket, el equipo correspondiente podrá revisar tu solicitud y atenderla dentro de este canal.'
     ].join('\n'));
-    embed.setFooter({text:'Hypnox Studios • Centro oficial de atención'});const image=getEnv('OFFICIAL_IMAGE_TICKETS');if(image)embed.setImage(image);await ch.send({embeds:[embed],components:[select()]});return i.reply({content:'Panel de atención publicado.',ephemeral:true});
+    embed.setFooter({text:'Hypnox Studios • Centro oficial de atención'});const image=getEnv('OFFICIAL_IMAGE_TICKETS')||getEnv('OFFICIAL_IMAGE_BANNER');if(image)embed.setImage(image);await ch.send({embeds:[embed],components:[select()]});return i.reply({content:'Panel de atención publicado.',ephemeral:true});
   }
 
   const ticket=await getTicket(i.channel.id);if(!ticket)return i.reply({content:'Este canal no es un ticket activo.',ephemeral:true});
