@@ -1,4 +1,4 @@
-const { Collection } = require('discord.js');
+const VALID_GUILDS = new Set(['official', 'staff', 'applications']);
 
 function validateCommands(commands) {
   const errors = [];
@@ -19,6 +19,15 @@ function validateCommands(commands) {
     }
     names.add(name);
 
+    if (!Array.isArray(command.guilds) || command.guilds.length === 0) {
+      errors.push(`${name}: debe declarar al menos un guild de destino`);
+    } else {
+      const invalidGuilds = command.guilds.filter((guild) => !VALID_GUILDS.has(guild));
+      const duplicatedGuilds = command.guilds.filter((guild, index) => command.guilds.indexOf(guild) !== index);
+      if (invalidGuilds.length) errors.push(`${name}: guild(s) inválida(s): ${invalidGuilds.join(', ')}`);
+      if (duplicatedGuilds.length) errors.push(`${name}: guild(s) duplicada(s): ${[...new Set(duplicatedGuilds)].join(', ')}`);
+    }
+
     try {
       command.data.toJSON();
     } catch (error) {
@@ -29,4 +38,4 @@ function validateCommands(commands) {
   return errors;
 }
 
-module.exports = { validateCommands };
+module.exports = { validateCommands, VALID_GUILDS };
