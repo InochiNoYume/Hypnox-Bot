@@ -1,94 +1,35 @@
 # Hypnox Bot
 
-Bot central de **Hypnox Studios** para los servidores de Discord, desarrollado con Node.js, JavaScript, discord.js y Supabase.
-
-## Servidores
-
-- **Official Discord:** comunidad pública, contenido, series, eventos, premios, soporte, alianzas y postulaciones.
-- **Staff Team Discord:** moderación, proyectos, departamentos y coordinación interna. No utiliza tickets.
-- **Staff Applications Discord:** espacio destinado al proceso de postulación. No utiliza formularios, entrevistas ni tickets.
-- **Development Discord:** servidor técnico para pruebas y desarrollo.
+Bot de Discord de Hypnox Studios, construido con Node.js, discord.js y Supabase.
 
 ## Arquitectura
 
-El bot utiliza una única aplicación de Discord y una única base de datos de Supabase para centralizar la información de los servidores.
+El bot funciona como una única aplicación backend para los servidores de Hypnox Studios. La configuración sensible y todos los identificadores de Discord se mantienen mediante variables de entorno.
 
-- Los servidores, roles y canales se identifican mediante IDs configurados en `.env`.
-- Las respuestas y embeds utilizan una identidad visual negra (`#000000`) y no dependen de nombres de roles.
-- Los registros se almacenan en Supabase y cada servidor utiliza un único canal de logs configurado.
-- `DISCORD_TOKEN` y `SUPABASE_SERVICE_ROLE_KEY` nunca deben publicarse.
-- No existe una aplicación web dependiente del bot.
+Los servidores soportados son:
 
-## Autoroles
+- `official`: servidor oficial de Hypnox Studios.
+- `staff`: servidor interno del Staff Team.
+- `applications`: servidor de postulaciones.
+- `dev`: servidor de desarrollo y pruebas. Recibe el conjunto de comandos de todos los demás servidores para validar cambios antes de producción.
 
-El bot asigna automáticamente un rol cuando un usuario entra a los servidores correspondientes:
+Los comandos normales se registran exclusivamente en los servidores declarados en cada comando. No existe un registro global intencional.
 
-- **Staff Team Discord:** asigna `STAFF_ROLE_TRAINEE_ID` → **Trainee**.
-- **Staff Applications Discord:** asigna `APPLICATIONS_ROLE_APPLICANT_ID` → **Applicant**.
+## Comandos
 
-El sistema utiliza el evento `guildMemberAdd` y requiere el intent **Guild Members** y que el bot tenga permiso para gestionar los roles. El rol que se asigna debe estar por debajo del rol máximo del bot en la jerarquía de Discord.
+El bot carga automáticamente los módulos de `src/commands/`.
 
-Los autoroles solo se asignan al momento de entrada. Cambiar una variable de entorno no aplica retroactivamente el rol a miembros que ya estaban dentro del servidor.
+Cada comando debe exportar:
 
-## Postulaciones
+```js
+module.exports = {
+  data,
+  execute,
+  guilds: ['official']
+};
+```
 
-El flujo actual es deliberadamente simple:
-
-1. `/abierto` abre la convocatoria y publica el enlace al Discord de postulaciones.
-2. Los candidatos realizan su postulación mediante el proceso definido para la convocatoria.
-3. El equipo revisa y evalúa las postulaciones.
-4. `/cerrado` cierra la convocatoria.
-5. `/aceptado @usuario1 ...` publica oficialmente a los usuarios aceptados.
-
-No se utilizan formularios, entrevistas ni tickets para este proceso. La documentación del proceso se publica mediante `/faq-postulaciones` y `/proceso-seleccion` en el servidor de Applications.
-
-## Tickets
-
-El sistema de tickets funciona **únicamente en Official Discord** mediante un panel único, selector de categoría y formulario modal antes de crear el canal.
-
-### Categorías y acceso
-
-| Categoría | Acceso |
-|---|---|
-| Soporte | Helper en adelante |
-| Reporte | T-Mod en adelante |
-| Alianza / Partner | Helper en adelante |
-| Contacto | Administrator, Director y Founder |
-| Bugs / Errores | Developer, Producer, Administrator, Director y Founder |
-
-Los permisos se resuelven mediante IDs de roles configurados en las variables de entorno.
-
-Al reclamar un ticket, el resto de los roles de atención pierde el acceso al canal y se conserva el acceso del creador y del miembro que lo reclamó. Los usuarios con permiso de Administrador de Discord pueden seguir accediendo porque Discord permite que `Administrator` omita los overwrites de canales.
-
-La categoría **Bugs / Errores** registra específicamente los fallos técnicos y está disponible para Developer y Producer, además de Dirección y Administración.
-
-### Formularios
-
-- **Soporte:** asunto, problema, detalles y evidencia opcional.
-- **Reporte:** usuario reportado, motivo, descripción y evidencia opcional.
-- **Alianza / Partner:** tipo, servidor/comunidad, propuesta, miembros y contacto.
-- **Contacto:** asunto, motivo, detalles y evidencia opcional.
-- **Bugs / Errores:** asunto, descripción, pasos para reproducir y evidencia opcional.
-
-Los valores de interfaz se normalizan antes de guardarse en Supabase. La base de datos acepta actualmente `support`, `report`, `alliance_partner`, `contact` y `bugs`.
-
-## Módulos
-
-- **Información:** help, reglas, links e información general.
-- **Moderación:** warn, warnings, unwarn, timeout, clear, slowmode, kick y ban.
-- **Tickets:** panel, formularios, creación, claim, cierre, adición y retirada de usuarios.
-- **Anuncios:** publicaciones oficiales con embed negro e imagen configurable.
-- **Eventos:** crear, editar, cancelar, iniciar y finalizar.
-- **Premios:** sorteos, participación, finalización, reroll y registro de entrega.
-- **Proyectos:** creación, edición, estado, cierre y asignación de manager.
-- **Postulaciones:** apertura, cierre, resultados, requisitos, FAQ y documentación del proceso.
-- **Autoroles:** asignación automática de Trainee en Staff Team y Applicant en Staff Applications.
-- **Administración:** configuración, canales, roles, permisos, mantenimiento y recarga.
-- **Logs:** un canal de logs por servidor y persistencia en Supabase.
-
-## Ayuda
-
-`/help inicio` muestra las categorías disponibles. La disponibilidad de las funciones se filtra mediante los IDs de roles configurados para cada servidor.
+`guilds` es obligatorio y solo admite `official`, `staff` y `applications`. El servidor `dev` es especial: durante el registro recibe todos los comandos para realizar pruebas.
 
 ## Configuración
 
@@ -148,8 +89,7 @@ Las migraciones se encuentran en `database/migrations/`.
 - `004_add_dev_guild_type.sql`: habilita el tipo de servidor de desarrollo/pruebas.
 - `20260902040000_harden_logs_and_rls_auto_enable.sql`: corrige categorías de logs, refuerza RLS en proyectos y tareas y restringe la ejecución pública de `rls_auto_enable()`.
 - `20260902050000_add_bugs_ticket_type.sql`: añade `bugs` como tipo válido de ticket.
-- `20260902172603_dashboard_access.sql`: migración histórica de una capa web descartada; se conserva únicamente como historial de migración.
-- `20260903031735_remove_dashboard_access.sql`: elimina esa capa histórica de acceso web y sus políticas asociadas.
+- `20260903031735_remove_dashboard_access.sql`: limpia restos de una capa de autorización web que ya no forma parte del proyecto.
 
 Las migraciones históricas ya aplicadas no deben ejecutarse nuevamente de forma ciega sobre una base existente. Primero debe comprobarse el estado real de la base de datos.
 
