@@ -2,7 +2,7 @@ require('dotenv').config();
 
 const { REST, Routes } = require('discord.js');
 const { getEnv, getGuildIds, validateEnv } = require('../src/config/env');
-const { loadCommandData } = require('../src/deploy-commands');
+const { loadCommandData, expectedForGuild, commandsEqual } = require('../src/deploy-commands');
 
 async function verify() {
   validateEnv();
@@ -20,21 +20,21 @@ async function verify() {
       const registered = await rest.get(
         Routes.applicationGuildCommands(getEnv('DISCORD_CLIENT_ID'), guildId)
       );
-      const expected = commands.filter((command) => guildType === 'dev' || command.guilds.includes(guildType));
-      const registeredNames = new Set((registered || []).map((command) => command.name));
-      const expectedNames = new Set(expected.map((command) => command.data.name));
-      const missing = [...expectedNames].filter((name) => !registeredNames.has(name));
-      const stale = [...registeredNames].filter((name) => !expectedNames.has(name));
+      const expected = expectedForGuild(commands, guildType);
 
-      if (missing.length || stale.length) {
+      if (!commandsEqual(expected, registered || [])) {
         failed = true;
-        console.error(`[HYPNOX] ${guildType}: FALTAN [${missing.join(', ')}] | SOBRAN [${stale.join(', ')}]`);
+        const expectedNames = new Set(expected.map((command) => command.name));
+        const registeredNames = new Set((registered || []).map((command) => command.name));
+        const missing = [...expectedNames].filter((name) => !registeredNames.has(name));
+        const stale = [...registeredNames].filter((name) => !expectedNames.has(name));
+        console.error(`[HYPNOX][COMMANDS] ${guildType}: DESINCRONIZADO — faltan [${missing.join(', ')}] | sobran [${stale.join(', ')}] | esperados ${expected.length} | registrados ${registered.length}.`);
       } else {
-        console.log(`[HYPNOX] ${guildType}: OK — ${registered.length} slash commands registrados.`);
+        console.log(`[HYPNOX][COMMANDS] ${guildType}: OK — ${registered.length} comandos registrados.`);
       }
     } catch (error) {
       failed = true;
-      console.error(`[HYPNOX] ${guildType}: ERROR — ${error.message}`);
+      console.error(`[HYPNOX][COMMANDS] ${guildType}: ERROR — ${error.message}`);
     }
   }
 
@@ -43,7 +43,7 @@ async function verify() {
 
 if (require.main === module) {
   verify().catch((error) => {
-    console.error('[HYPNOX] Verificación de comandos fallida:', error.message);
+    console.error('[HYPNOX][COMMANDS] Verificación fallida:', error.message);
     process.exit(1);
   });
 }
