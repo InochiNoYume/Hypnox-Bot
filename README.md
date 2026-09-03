@@ -1,21 +1,23 @@
 # Hypnox Bot
 
-Bot central de **Hypnox Studios** para tres servidores de Discord, desarrollado con Node.js, JavaScript, discord.js y Supabase.
+Bot central de **Hypnox Studios** para los servidores de Discord, desarrollado con Node.js, JavaScript, discord.js y Supabase.
 
 ## Servidores
 
 - **Official Discord:** comunidad pública, contenido, series, eventos, premios, soporte, alianzas y postulaciones.
 - **Staff Team Discord:** moderación, proyectos, departamentos y coordinación interna. No utiliza tickets.
 - **Staff Applications Discord:** espacio destinado al proceso de postulación. No utiliza formularios, entrevistas ni tickets.
+- **Development Discord:** servidor técnico para pruebas y desarrollo.
 
 ## Arquitectura
 
-El bot utiliza una única aplicación de Discord y una única base de datos de Supabase para centralizar la información de los tres servidores.
+El bot utiliza una única aplicación de Discord y una única base de datos de Supabase para centralizar la información de los servidores.
 
 - Los servidores, roles y canales se identifican mediante IDs configurados en `.env`.
 - Las respuestas y embeds utilizan una identidad visual negra (`#000000`) y no dependen de nombres de roles.
 - Los registros se almacenan en Supabase y cada servidor utiliza un único canal de logs configurado.
 - `DISCORD_TOKEN` y `SUPABASE_SERVICE_ROLE_KEY` nunca deben publicarse.
+- No existe un dashboard web ni una segunda aplicación que dependa de este repositorio.
 
 ## Autoroles
 
@@ -72,7 +74,7 @@ Los valores de interfaz se normalizan antes de guardarse en Supabase. La base de
 
 ## Módulos
 
-- **Información:** help, reglas, roles, links e información general.
+- **Información:** help, reglas, links e información general.
 - **Moderación:** warn, warnings, unwarn, timeout, clear, slowmode, kick y ban.
 - **Tickets:** panel, formularios, creación, claim, cierre, adición y retirada de usuarios.
 - **Anuncios:** publicaciones oficiales con embed negro e imagen configurable.
@@ -97,7 +99,7 @@ Los valores de interfaz se normalizan antes de guardarse en Supabase. La base de
 5. Registra los comandos con `npm run deploy` cuando corresponda.
 6. Inicia el bot con `npm start`.
 
-En Wispbyte, después de actualizar el repositorio, reinicia el servicio para que descargue los cambios y vuelva a cargar las variables de entorno.
+En Wispbyte, las variables de entorno se mantienen en la configuración del servicio y **no deben reemplazarse por un `.env` del repositorio**. Después de actualizar el código, reinicia el servicio para aplicar la nueva versión usando las variables que ya están configuradas allí.
 
 ## Variables principales
 
@@ -146,10 +148,12 @@ Las migraciones se encuentran en `database/migrations/`.
 - `004_add_dev_guild_type.sql`: habilita el tipo de servidor de desarrollo/pruebas.
 - `20260902040000_harden_logs_and_rls_auto_enable.sql`: corrige categorías de logs, refuerza RLS en proyectos y tareas y restringe la ejecución pública de `rls_auto_enable()`.
 - `20260902050000_add_bugs_ticket_type.sql`: añade `bugs` como tipo válido de ticket.
+- `20260902172603_dashboard_access.sql`: migración histórica de la arquitectura web descartada; ya no forma parte del sistema operativo.
+- `20260902180000_remove_dashboard_access.sql`: elimina la capa histórica de acceso web y sus políticas asociadas.
 
-Algunas migraciones históricas ya fueron aplicadas directamente en el proyecto de Supabase antes de quedar registradas en el historial local. **No deben ejecutarse nuevamente de forma ciega** sobre una base existente. Primero debe comprobarse el estado real de la base de datos.
+Las migraciones históricas ya aplicadas no deben ejecutarse nuevamente de forma ciega sobre una base existente. Primero debe comprobarse el estado real de la base de datos.
 
-El bot utiliza `SUPABASE_SERVICE_ROLE_KEY` desde el backend, por lo que las operaciones internas no dependen de exponer las tablas a clientes públicos.
+El bot utiliza `SUPABASE_SERVICE_ROLE_KEY` exclusivamente desde el backend. Esta credencial nunca debe exponerse en el cliente ni publicarse en GitHub.
 
 ## Dependencias
 
@@ -159,8 +163,6 @@ Las versiones principales están fijadas en `package.json`:
 - discord.js `14.27.0`
 - @supabase/supabase-js `2.112.4`
 - dotenv `17.4.2`
-
-El repositorio actualmente no incluye `package-lock.json`; si se incorpora uno en el futuro, debe mantenerse sincronizado con `package.json` para asegurar instalaciones reproducibles.
 
 ## Seguridad
 
@@ -176,4 +178,4 @@ El repositorio actualmente no incluye `package-lock.json`; si se incorpora uno e
 
 **Hypnox Studios — Hypnox Bot**
 
-Repositorio oficial del código del bot y su infraestructura de configuración.
+Repositorio principal y único del código del bot y su infraestructura de configuración.
