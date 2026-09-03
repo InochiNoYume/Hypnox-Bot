@@ -8,23 +8,18 @@ const required = [
   'SUPABASE_SERVICE_ROLE_KEY'
 ];
 
-const SNOWFLAKE_KEYS = [
-  'DISCORD_CLIENT_ID',
-  'DISCORD_DEV_GUILD_ID',
-  'DEV_GUILD_ID',
-  'OFFICIAL_GUILD_ID',
-  'STAFF_GUILD_ID',
-  'APPLICATIONS_GUILD_ID',
-  'OFFICIAL_LOGS_CHANNEL_ID',
-  'STAFF_LOGS_CHANNEL_ID',
-  'APPLICATIONS_LOGS_CHANNEL_ID',
-  'DEV_LOGS_CHANNEL_ID'
-];
+const DISCORD_ID_PATTERN = /^\d{17,20}$/;
 
 function getEnv(key, fallback = undefined) {
   const value = process.env[key];
   if (value === undefined || value === null) return fallback;
   return typeof value === 'string' ? value.trim() : value;
+}
+
+function getDiscordIdKeys() {
+  return Object.keys(process.env)
+    .filter((key) => key.endsWith('_ID'))
+    .filter((key) => !key.startsWith('SUPABASE_'));
 }
 
 function validateEnv() {
@@ -44,9 +39,9 @@ function validateEnv() {
     throw new Error('SUPABASE_URL no es una URL válida.');
   }
 
-  const invalidIds = SNOWFLAKE_KEYS
+  const invalidIds = getDiscordIdKeys()
     .map((key) => [key, getEnv(key)])
-    .filter(([, value]) => value && !/^\d{17,20}$/.test(String(value)))
+    .filter(([, value]) => value && !DISCORD_ID_PATTERN.test(String(value)))
     .map(([key]) => key);
 
   if (invalidIds.length) {
@@ -56,6 +51,11 @@ function validateEnv() {
   const status = getEnv('BOT_STATUS', 'dnd');
   if (!['online', 'idle', 'dnd', 'invisible'].includes(status)) {
     throw new Error(`BOT_STATUS inválido: ${status}. Usa online, idle, dnd o invisible.`);
+  }
+
+  const debug = getEnv('DEBUG', 'false').toLowerCase();
+  if (!['true', 'false'].includes(debug)) {
+    throw new Error(`DEBUG inválido: ${debug}. Usa true o false.`);
   }
 }
 
