@@ -72,9 +72,10 @@ async function registerSlashCommands(client) {
       const guild = await client.guilds.fetch(guildId);
       console.log(`[HYPNOX] Guild ${guildType}: ${guild.name} (${guild.id}) — acceso OK.`);
 
-      const registered = await rest.put(
-        Routes.applicationGuildCommands(getEnv('DISCORD_CLIENT_ID'), guildId),
-        { body }
+      const registered = await withTimeout(
+        rest.put(Routes.applicationGuildCommands(getEnv('DISCORD_CLIENT_ID'), guildId), { body }),
+        15_000,
+        `Discord REST no respondió al registrar comandos de ${guildType}.`
       );
 
       const registeredCount = Array.isArray(registered) ? registered.length : 0;
@@ -128,7 +129,6 @@ function registerAutoRoles(client) {
   client.on('guildMemberAdd', async (member) => {
     try {
       const guildType = getGuildType(member.guild.id);
-
       if (guildType === 'staff') {
         await assignAutoRole(member, 'STAFF_ROLE_TRAINEE_ID', 'Trainee');
         await assignAutoRole(member, 'STAFF_ROLE_FORMACION_ID', 'Formación');
@@ -147,61 +147,21 @@ function registerConnectionDiagnostics(client) {
     if (/heartbeat|heartbeat acknowledged/i.test(text)) return;
     console.log(`[HYPNOX][DISCORD DEBUG] ${text}`);
   });
-
-  client.on('warn', (message) => {
-    console.warn(`[HYPNOX][DISCORD WARN] ${message}`);
-  });
-
-  client.on('shardError', (error) => {
-    console.error('[HYPNOX][DISCORD SHARD ERROR]', error);
-  });
-
-  client.on('shardDisconnect', (event, shardId) => {
-    console.warn(`[HYPNOX][DISCORD] Shard ${shardId} desconectado. Código ${event?.code ?? 'desconocido'}.`);
-  });
-
-  client.on('shardReconnecting', (shardId) => {
-    console.warn(`[HYPNOX][DISCORD] Shard ${shardId} intentando reconectar...`);
-  });
-
-  client.on('invalidated', () => {
-    console.error('[HYPNOX][DISCORD] La sesión fue invalidada. Será necesario volver a iniciar sesión.');
-  });
+  client.on('warn', (message) => console.warn(`[HYPNOX][DISCORD WARN] ${message}`));
+  client.on('shardError', (error) => console.error('[HYPNOX][DISCORD SHARD ERROR]', error));
+  client.on('shardDisconnect', (event, shardId) => console.warn(`[HYPNOX][DISCORD] Shard ${shardId} desconectado. Código ${event?.code ?? 'desconocido'}.`));
+  client.on('shardReconnecting', (shardId) => console.warn(`[HYPNOX][DISCORD] Shard ${shardId} intentando reconectar...`));
+  client.on('invalidated', () => console.error('[HYPNOX][DISCORD] La sesión fue invalidada. Será necesario volver a iniciar sesión.'));
 }
 
 async function verifyDiscordToken() {
   const token = getEnv('DISCORD_TOKEN');
-  const clientId = getEnv('DISCORD_CLIENT_ID');
-  const rest = new REST({ version: '10' }).setToken(token);
-
-  console.log('[HYPNOX] Verificando credenciales de Discord mediante REST API...');
-
-  try {
-    const botUser = await withTimeout(
-      rest.get(Routes.user()),
-      15_000,
-      'Discord REST no respondió dentro de 15 segundos.'
-    );
-
-    if (!botUser?.id) throw new Error('Discord no devolvió la identidad del bot.');
-    if (clientId && botUser.id !== clientId) {
-      throw new Error(`DISCORD_CLIENT_ID no coincide con el bot del token. Token pertenece a ${botUser.id}, pero DISCORD_CLIENT_ID es ${clientId}.`);
-    }
-
-    console.log(`[HYPNOX] Credenciales de Discord OK: ${botUser.username ?? botUser.global_name ?? 'bot'} (${botUser.id}).`);
-    return botUser;
-  } catch (error) {
-    const status = error?.status || error?.rawError?.code;
-    if (status === 401 || /401|unauthorized|invalid token/i.test(error?.message || '')) {
-      throw new Error('DISCORD_TOKEN rechazado por Discord (401 Unauthorized). Genera/copía nuevamente el token del bot y actualízalo en Wispbyte.');
-    }
-    throw new Error(`No se pudo validar DISCORD_TOKEN con Discord: ${error.message}`);
-  }
+  if (!token) throw new Error('DISCORD_TOKEN no está configurado.');
+  console.log('[HYPNOX] Token de Discord presente. Se validará mediante el Gateway.');
 }
 
 async function loginWithDiagnostics(client) {
   const timeoutMs = 45_000;
-
   console.log('[HYPNOX] Iniciando conexión con Discord Gateway...');
   console.log(`[HYPNOX] Token configurado: ${getEnv('DISCORD_TOKEN') ? 'sí' : 'no'}. Client ID configurado: ${getEnv('DISCORD_CLIENT_ID') ? 'sí' : 'no'}.`);
 
@@ -213,7 +173,8 @@ async function loginWithDiagnostics(client) {
     );
     console.log('[HYPNOX] Inicio de sesión solicitado correctamente. Esperando clientReady...');
   } catch (error) {
-    throw new Error(`No se pudo iniciar sesión en Discord: ${error.message}`);
+    const message = error?.message || String(error);
+    throw new Error(`No se pudo iniciar sesión en Discord: ${message}`);
   }
 }
 
@@ -246,12 +207,17 @@ async function handleClientReady(client) {
   } catch (error) {
     console.error('[HYPNOX] Error sincronizando servidores con Supabase:', error.message);
   }
+
+  try {
+    await verifySupabaseConnection();
+  } catch (error) {
+    console.error('[HYPNOX] Supabase está fuera de servicio o mal configurado, pero Discord permanece conectado:', error.message);
+  }
 }
 
 async function bootstrap() {
   validateEnv();
   console.log('[HYPNOX] Variables de entorno validadas.');
-  await verifySupabaseConnection();
 
   const client = new Client({
     intents: [
@@ -266,9 +232,7 @@ async function bootstrap() {
   loadCommands(client);
 
   const commandErrors = validateCommands(client.commands);
-  if (commandErrors.length) {
-    throw new Error(`Comandos inválidos: ${commandErrors.join(' | ')}`);
-  }
+  if (commandErrors.length) throw new Error(`Comandos inválidos: ${commandErrors.join(' | ')}`);
   console.log(`[HYPNOX] Validación de comandos OK: ${client.commands.size} comandos.`);
 
   registerEvents(client);
@@ -279,9 +243,7 @@ async function bootstrap() {
   registerConnectionDiagnostics(client);
 
   client.once('clientReady', () => {
-    handleClientReady(client).catch((error) => {
-      console.error('[HYPNOX] Error inesperado en clientReady:', error);
-    });
+    handleClientReady(client).catch((error) => console.error('[HYPNOX] Error inesperado en clientReady:', error));
   });
 
   client.on('error', error => console.error('[HYPNOX] Discord client error:', error));
@@ -299,12 +261,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = {
-  bootstrap,
-  registerSlashCommands,
-  registerAutoRoles,
-  registerConnectionDiagnostics,
-  verifyDiscordToken,
-  loginWithDiagnostics,
-  verifySupabaseConnection
-};
+module.exports = { bootstrap, registerSlashCommands, registerAutoRoles, registerConnectionDiagnostics, verifyDiscordToken, loginWithDiagnostics, verifySupabaseConnection };
