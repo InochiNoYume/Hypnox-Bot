@@ -1,9 +1,10 @@
 require('dotenv').config();
 
-const { Client, GatewayIntentBits, Collection, REST, Routes } = require('discord.js');
-const { validateEnv, getEnv } = require('./config/env');
+const { Client, GatewayIntentBits, Collection } = require('discord.js');
+const { validateEnv, getEnv, getGuildIds } = require('./config/env');
 const { getGuildType } = require('./utils/guild');
 const { validateCommands } = require('./utils/validateCommands');
+const { loadCommandData, syncGuildCommands } = require('./deploy-commands');
 const supabase = require('./database/supabase');
 const loadCommands = require('./handlers/loadCommands');
 const registerEvents = require('./handlers/registerEvents');
@@ -11,13 +12,10 @@ const registerPrefix = require('./handlers/registerPrefix');
 const { registerWelcome } = require('./handlers/registerWelcome');
 const { configurePresence } = require('./utils/presence');
 
+const REQUEST_TIMEOUT_MS = 15_000;
+
 function getConfiguredGuilds() {
-  return [
-    ['official', getEnv('OFFICIAL_GUILD_ID')],
-    ['staff', getEnv('STAFF_GUILD_ID')],
-    ['applications', getEnv('APPLICATIONS_GUILD_ID')],
-    ['dev', getEnv('DISCORD_DEV_GUILD_ID') || getEnv('DEV_GUILD_ID')]
-  ].filter(([, guildId]) => guildId);
+  return Object.entries(getGuildIds()).filter(([, guildId]) => guildId);
 }
 
 async function withTimeout(promise, timeoutMs, message) {
@@ -39,7 +37,7 @@ async function verifySupabaseConnection() {
   const startedAt = Date.now();
   const { error } = await withTimeout(
     supabase.from('guilds').select('id').limit(1),
-    15_000,
+    REQUEST_TIMEOUT_MS,
     'Supabase no respondió dentro de 15 segundos.'
   );
 
@@ -48,65 +46,35 @@ async function verifySupabaseConnection() {
 }
 
 async function registerSlashCommands(client) {
-  const commands = [...client.commands.values()];
-  const commandErrors = validateCommands(client.commands);
-  if (commandErrors.length) {
-    throw new Error(`Definiciones de comandos inválidas: ${commandErrors.join(' | ')}`);
-  }
-
+  const commands = loadCommandData();
   const guilds = getConfiguredGuilds();
-  const rest = new REST({ version: '10' }).setToken(getEnv('DISCORD_TOKEN'));
-  let failures = 0;
+  const failures = [];
+  const rest = require('./deploy-commands').createRestClient
+    ? require('./deploy-commands').createRestClient()
+    : null;
 
-  console.log(`[HYPNOX][COMMANDS] Verificando registro en ${guilds.length} guild(s)...`);
-
-  for (const [guildType, guildId] of guilds) {
-    const body = commands
-      .filter((command) => guildType === 'dev' || (command.guilds || ['official', 'staff', 'applications']).includes(guildType))
-      .map((command) => command.data.toJSON());
-
-    try {
-      const guild = await withTimeout(
-        client.guilds.fetch(guildId),
-        15_000,
-        `Discord no respondió al consultar la guild ${guildType}.`
-      );
-      console.log(`[HYPNOX][COMMANDS] ${guildType}: ${guild.name} (${guild.id}) — acceso OK.`);
-
-      const registered = await withTimeout(
-        rest.put(Routes.applicationGuildCommands(getEnv('DISCORD_CLIENT_ID'), guildId), { body }),
-        15_000,
-        `Discord REST no respondió al registrar comandos de ${guildType}.`
-      );
-
-      const registeredCount = Array.isArray(registered) ? registered.length : 0;
-      if (registeredCount !== body.length) {
-        failures += 1;
-        console.error(`[HYPNOX][COMMANDS] ${guildType}: registro incompleto. Esperados ${body.length}, Discord devolvió ${registeredCount}.`);
-        continue;
+  if (!rest) {
+    const { REST } = require('discord.js');
+    const clientRest = new REST({ version: '10' }).setToken(getEnv('DISCORD_TOKEN'));
+    for (const [guildType, guildId] of guilds) {
+      try {
+        const guild = await withTimeout(client.guilds.fetch(guildId), REQUEST_TIMEOUT_MS, `Discord no respondió al consultar ${guildType}.`);
+        await syncGuildCommands(clientRest, guildType, guildId, commands);
+        console.log(`[HYPNOX][COMMANDS] ${guildType}: ${guild.name} (${guildId}).`);
+      } catch (error) {
+        failures.push(guildType);
+        console.error(`[HYPNOX][COMMANDS] ${guildType} (${guildId}): ${error.message}`);
       }
-
-      const registeredNames = new Set(registered.map((command) => command.name));
-      const missing = body.map((command) => command.name).filter((name) => !registeredNames.has(name));
-      if (missing.length) {
-        failures += 1;
-        console.error(`[HYPNOX][COMMANDS] ${guildType}: faltan comandos: ${missing.join(', ')}.`);
-        continue;
-      }
-
-      console.log(`[HYPNOX][COMMANDS] ${guildType}: ${registeredCount} comandos registrados y verificados.`);
-    } catch (error) {
-      failures += 1;
-      console.error(`[HYPNOX][COMMANDS] ${guildType} (${guildId}): ${error.message}`);
     }
   }
 
-  if (failures) {
-    throw new Error(`Registro de slash commands fallido en ${failures} guild(s).`);
+  if (failures.length) {
+    console.error(`[HYPNOX][COMMANDS] Sincronización incompleta: ${failures.join(', ')}.`);
+  } else {
+    console.log(`[HYPNOX][COMMANDS] Sincronización completada en ${guilds.length} guild(s).`);
   }
 
-  console.log('[HYPNOX][COMMANDS] Registro completado correctamente en todas las guilds configuradas.');
-  return { guilds: guilds.length, failures: 0 };
+  return { guilds: guilds.length, failures };
 }
 
 async function assignAutoRole(member, roleEnv, label) {
@@ -142,11 +110,19 @@ function registerAutoRoles(client) {
 }
 
 function registerConnectionDiagnostics(client) {
-  client.on('debug', (message) => {
-    const text = String(message);
-    if (/heartbeat|heartbeat acknowledged/i.test(text)) return;
-    console.log(`[HYPNOX][DISCORD DEBUG] ${text}`);
-  });
+  const debugEnabled = getEnv('DEBUG', 'false').toLowerCase() === 'true';
+
+  if (debugEnabled) {
+    client.on('debug', (message) => {
+      let text = String(message);
+      const token = getEnv('DISCORD_TOKEN');
+      if (token) text = text.replaceAll(token, '[REDACTED]');
+      text = text.replace(/(provided token:\s*)\S+/gi, '$1[REDACTED]');
+      if (/heartbeat|heartbeat acknowledged/i.test(text)) return;
+      console.log(`[HYPNOX][DISCORD DEBUG] ${text}`);
+    });
+  }
+
   client.on('warn', (message) => console.warn(`[HYPNOX][DISCORD WARN] ${message}`));
   client.on('shardError', (error) => console.error('[HYPNOX][DISCORD SHARD ERROR]', error));
   client.on('shardDisconnect', (event, shardId) => console.warn(`[HYPNOX][DISCORD] Shard ${shardId} desconectado. Código ${event?.code ?? 'desconocido'}.`));
@@ -178,6 +154,36 @@ async function loginWithDiagnostics(client) {
   }
 }
 
+async function syncGuildsToSupabase(client) {
+  const configured = getConfiguredGuilds();
+  const servers = [];
+
+  for (const [guildType, guildId] of configured) {
+    try {
+      const guild = await withTimeout(client.guilds.fetch(guildId), REQUEST_TIMEOUT_MS, `Discord no respondió al consultar ${guildType}.`);
+      servers.push({
+        discord_guild_id: guild.id,
+        guild_type: guildType,
+        name: guild.name,
+        enabled: true
+      });
+    } catch (error) {
+      console.error(`[HYPNOX][SUPABASE] No se pudo obtener ${guildType} (${guildId}): ${error.message}`);
+    }
+  }
+
+  if (!servers.length) throw new Error('No se pudo obtener ninguna guild configurada desde Discord.');
+
+  const { error } = await withTimeout(
+    supabase.from('guilds').upsert(servers, { onConflict: 'discord_guild_id' }),
+    REQUEST_TIMEOUT_MS,
+    'Supabase no respondió al sincronizar servidores.'
+  );
+  if (error) throw error;
+
+  console.log(`[HYPNOX][SUPABASE] ${servers.length} servidor(es) sincronizado(s) correctamente.`);
+}
+
 async function handleClientReady(client) {
   console.log(`[HYPNOX][READY] CONECTADO COMO ${client.user.tag} (${client.user.id})`);
 
@@ -185,29 +191,12 @@ async function handleClientReady(client) {
     await registerSlashCommands(client);
   } catch (error) {
     console.error('[HYPNOX][COMMANDS] ERROR:', error.message);
-    return;
   }
 
   try {
-    const servers = [
-      { discord_guild_id: getEnv('OFFICIAL_GUILD_ID'), guild_type: 'official', name: 'Hypnox Studios Official Discord' },
-      { discord_guild_id: getEnv('STAFF_GUILD_ID'), guild_type: 'staff', name: 'Hypnox Studios Staff Team Discord' },
-      { discord_guild_id: getEnv('APPLICATIONS_GUILD_ID'), guild_type: 'applications', name: 'Hypnox Studios Staff Applications Discord' }
-    ];
-    const devGuildId = getEnv('DISCORD_DEV_GUILD_ID') || getEnv('DEV_GUILD_ID');
-    if (devGuildId) servers.push({ discord_guild_id: devGuildId, guild_type: 'dev', name: 'Hypnox Studios Development Server' });
-
-    const validServers = servers.filter((server) => server.discord_guild_id);
-    const { error } = await withTimeout(
-      supabase.from('guilds').upsert(validServers, { onConflict: 'discord_guild_id' }),
-      15_000,
-      'Supabase no respondió al sincronizar servidores.'
-    );
-    if (error) throw error;
-    console.log('[HYPNOX][SUPABASE] Servidores sincronizados correctamente.');
+    await syncGuildsToSupabase(client);
   } catch (error) {
     console.error('[HYPNOX][SUPABASE] Error sincronizando servidores:', error.message);
-    return;
   }
 
   try {
@@ -248,19 +237,22 @@ async function bootstrap() {
     handleClientReady(client).catch((error) => console.error('[HYPNOX][READY] Error inesperado:', error));
   });
 
-  client.on('error', error => console.error('[HYPNOX][DISCORD] Client error:', error));
-  process.on('unhandledRejection', error => console.error('[HYPNOX][PROCESS] Unhandled rejection:', error));
-  process.on('uncaughtException', error => console.error('[HYPNOX][PROCESS] Uncaught exception:', error));
+  client.on('error', (error) => console.error('[HYPNOX][DISCORD] Client error:', error));
+  process.on('unhandledRejection', (error) => console.error('[HYPNOX][PROCESS] Unhandled rejection:', error));
+  process.on('uncaughtException', (error) => {
+    console.error('[HYPNOX][PROCESS] Uncaught exception:', error);
+    process.exitCode = 1;
+  });
 
   await verifyDiscordToken();
   await loginWithDiagnostics(client);
 }
 
 if (require.main === module) {
-  bootstrap().catch(error => {
+  bootstrap().catch((error) => {
     console.error('[HYPNOX] Error iniciando el bot:', error);
     process.exit(1);
   });
 }
 
-module.exports = { bootstrap, registerSlashCommands, registerAutoRoles, registerConnectionDiagnostics, verifyDiscordToken, loginWithDiagnostics, verifySupabaseConnection };
+module.exports = { bootstrap, registerSlashCommands, registerAutoRoles, registerConnectionDiagnostics, verifyDiscordToken, loginWithDiagnostics, verifySupabaseConnection, syncGuildsToSupabase };
