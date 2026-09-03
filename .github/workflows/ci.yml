@@ -25,3 +25,5 @@ jobs:
           while IFS= read -r file; do
             node --check "$file"
           done < <(find src -type f -name '*.js' -print)
+      - name: Runtime module validation
+        run: npm run validate
