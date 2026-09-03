@@ -3,7 +3,7 @@ require('dotenv').config();
 const fs = require('node:fs');
 const path = require('node:path');
 const { REST, Routes } = require('discord.js');
-const { validateEnv, getGuildIds } = require('./config/env');
+const { validateEnv, getGuildIds, getEnv } = require('./config/env');
 
 function loadCommandData() {
   const commandsPath = path.join(__dirname, 'commands');
@@ -21,7 +21,7 @@ function loadCommandData() {
 async function deploy() {
   validateEnv();
 
-  const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN);
+  const rest = new REST({ version: '10' }).setToken(getEnv('DISCORD_TOKEN'));
   const guildIds = getGuildIds();
   const commands = loadCommandData();
 
@@ -33,7 +33,7 @@ async function deploy() {
       .map((command) => command.data.toJSON());
 
     await rest.put(
-      Routes.applicationGuildCommands(process.env.DISCORD_CLIENT_ID, guildId),
+      Routes.applicationGuildCommands(getEnv('DISCORD_CLIENT_ID'), guildId),
       { body }
     );
 
@@ -41,7 +41,11 @@ async function deploy() {
   }
 }
 
-deploy().catch((error) => {
-  console.error('[HYPNOX] Error registrando comandos:', error);
-  process.exit(1);
-});
+if (require.main === module) {
+  deploy().catch((error) => {
+    console.error('[HYPNOX] Error registrando comandos:', error);
+    process.exit(1);
+  });
+}
+
+module.exports = { deploy, loadCommandData };
