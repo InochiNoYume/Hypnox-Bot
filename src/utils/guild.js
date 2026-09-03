@@ -12,7 +12,8 @@ function getGuildLogsChannelId(type) {
   const map = {
     official: config.logs.official,
     staff: config.logs.staff,
-    applications: config.logs.applications
+    applications: config.logs.applications,
+    dev: config.logs.dev
   };
   return map[type] || null;
 }
