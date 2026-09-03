@@ -8,12 +8,43 @@ const required = [
   'SUPABASE_SERVICE_ROLE_KEY'
 ];
 
-function validateEnv() {
-  const missing = required.filter((key) => !process.env[key]);
-  if (missing.length) throw new Error(`Variables de entorno faltantes: ${missing.join(', ')}`);
+const SNOWFLAKE_KEYS = [
+  'DISCORD_CLIENT_ID',
+  'DISCORD_DEV_GUILD_ID',
+  'DEV_GUILD_ID',
+  'OFFICIAL_GUILD_ID',
+  'STAFF_GUILD_ID',
+  'APPLICATIONS_GUILD_ID',
+  'OFFICIAL_LOGS_CHANNEL_ID',
+  'STAFF_LOGS_CHANNEL_ID',
+  'APPLICATIONS_LOGS_CHANNEL_ID',
+  'DEV_LOGS_CHANNEL_ID'
+];
+
+function getEnv(key, fallback = undefined) {
+  const value = process.env[key];
+  if (value === undefined || value === null) return fallback;
+  return typeof value === 'string' ? value.trim() : value;
 }
 
-function getEnv(key, fallback = undefined) { return process.env[key] ?? fallback; }
+function validateEnv() {
+  const missing = required.filter((key) => !getEnv(key));
+  if (missing.length) throw new Error(`Variables de entorno faltantes: ${missing.join(', ')}`);
+
+  const invalidIds = SNOWFLAKE_KEYS
+    .map((key) => [key, getEnv(key)])
+    .filter(([, value]) => value && !/^\d{17,20}$/.test(String(value)))
+    .map(([key]) => key);
+
+  if (invalidIds.length) {
+    throw new Error(`Snowflakes de Discord inválidos en: ${invalidIds.join(', ')}`);
+  }
+
+  const status = getEnv('BOT_STATUS', 'dnd');
+  if (!['online', 'idle', 'dnd', 'invisible'].includes(status)) {
+    throw new Error(`BOT_STATUS inválido: ${status}. Usa online, idle, dnd o invisible.`);
+  }
+}
 
 const guilds = {
   official: getEnv('OFFICIAL_GUILD_ID'),
@@ -29,6 +60,8 @@ const logs = {
   dev: getEnv('DEV_LOGS_CHANNEL_ID')
 };
 
-function getGuildIds() { return guilds; }
+function getGuildIds() {
+  return guilds;
+}
 
 module.exports = { validateEnv, getEnv, getGuildIds, guilds, logs };
