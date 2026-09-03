@@ -1,9 +1,11 @@
-const { ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder } = require('discord.js');
+const { ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder, MessageFlags } = require('discord.js');
 const { getEnv } = require('../config/env');
 const { getTicket, updateTicket, addTicketEvent } = require('./tickets');
 const { writeLog } = require('./logs');
 const { hasConfiguredRole } = require('../utils/permissions');
 const { brandedEmbed } = require('../utils/embeds');
+
+const EPHEMERAL = MessageFlags.Ephemeral;
 
 const TICKET_ACCESS = {
   support: ['OFFICIAL_ROLE_FOUNDER_ID','OFFICIAL_ROLE_DIRECTOR_ID','OFFICIAL_ROLE_ADMINISTRATOR_ID','OFFICIAL_ROLE_SRMOD_ID','OFFICIAL_ROLE_MOD_ID','OFFICIAL_ROLE_TMOD_ID','OFFICIAL_ROLE_HELPER_ID'],
@@ -36,18 +38,18 @@ function buildCloseModal() {
 
 async function showCloseModal(interaction) {
   const ticket = await getTicket(interaction.channelId);
-  if (!ticket) return interaction.reply({ content: 'Este canal no corresponde a un ticket abierto.', ephemeral: true });
-  if (!canCloseTicket(interaction, ticket)) return interaction.reply({ content: 'No tienes permiso para cerrar este ticket.', ephemeral: true });
+  if (!ticket) return interaction.reply({ content: 'Este canal no corresponde a un ticket abierto.', flags: EPHEMERAL });
+  if (!canCloseTicket(interaction, ticket)) return interaction.reply({ content: 'No tienes permiso para cerrar este ticket.', flags: EPHEMERAL });
   return interaction.showModal(buildCloseModal());
 }
 
 async function closeTicketWithReason(interaction, reason) {
   const ticket = await getTicket(interaction.channelId);
-  if (!ticket) return interaction.reply({ content: 'Este ticket ya está cerrado o no existe.', ephemeral: true });
-  if (!canCloseTicket(interaction, ticket)) return interaction.reply({ content: 'No tienes permiso para cerrar este ticket.', ephemeral: true });
+  if (!ticket) return interaction.reply({ content: 'Este ticket ya está cerrado o no existe.', flags: EPHEMERAL });
+  if (!canCloseTicket(interaction, ticket)) return interaction.reply({ content: 'No tienes permiso para cerrar este ticket.', flags: EPHEMERAL });
 
   const cleanReason = String(reason || '').trim();
-  if (cleanReason.length < 5) return interaction.reply({ content: 'El motivo de cierre debe tener al menos 5 caracteres.', ephemeral: true });
+  if (cleanReason.length < 5) return interaction.reply({ content: 'El motivo de cierre debe tener al menos 5 caracteres.', flags: EPHEMERAL });
 
   const channel = interaction.channel;
   await updateTicket(ticket.id, {
@@ -80,7 +82,7 @@ async function closeTicketWithReason(interaction, reason) {
   if (interaction.deferred || interaction.replied) {
     await interaction.editReply({ content: 'Ticket cerrado. El canal será eliminado en unos segundos.' }).catch(() => {});
   } else {
-    await interaction.reply({ content: 'Ticket cerrado. El canal será eliminado en unos segundos.', ephemeral: true });
+    await interaction.reply({ content: 'Ticket cerrado. El canal será eliminado en unos segundos.', flags: EPHEMERAL });
   }
 
   setTimeout(async () => {
