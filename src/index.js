@@ -139,6 +139,35 @@ function registerConnectionDiagnostics(client) {
   });
 }
 
+async function verifyDiscordToken() {
+  const token = getEnv('DISCORD_TOKEN');
+  const clientId = getEnv('DISCORD_CLIENT_ID');
+  const rest = new REST({ version: '10' }).setToken(token);
+
+  console.log('[HYPNOX] Verificando credenciales de Discord mediante REST API...');
+
+  try {
+    const botUser = await Promise.race([
+      rest.get(Routes.user()),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('Discord REST no respondió dentro de 15 segundos.')), 15_000))
+    ]);
+
+    if (!botUser?.id) throw new Error('Discord no devolvió la identidad del bot.');
+    if (clientId && botUser.id !== clientId) {
+      throw new Error(`DISCORD_CLIENT_ID no coincide con el bot del token. Token pertenece a ${botUser.id}, pero DISCORD_CLIENT_ID es ${clientId}.`);
+    }
+
+    console.log(`[HYPNOX] Credenciales de Discord OK: ${botUser.username ?? botUser.global_name ?? 'bot'} (${botUser.id}).`);
+    return botUser;
+  } catch (error) {
+    const status = error?.status || error?.rawError?.code;
+    if (status === 401 || /401|unauthorized|invalid token/i.test(error?.message || '')) {
+      throw new Error('DISCORD_TOKEN rechazado por Discord (401 Unauthorized). Genera/copía nuevamente el token del bot y actualízalo en Wispbyte.');
+    }
+    throw new Error(`No se pudo validar DISCORD_TOKEN con Discord: ${error.message}`);
+  }
+}
+
 async function loginWithDiagnostics(client) {
   const timeoutMs = 45_000;
   let timer;
@@ -187,33 +216,7 @@ async function bootstrap() {
   configurePresence(client);
   registerConnectionDiagnostics(client);
 
-  client.once('clientReady', async () => {
-    console.log(`[HYPNOX] CONECTADO COMO ${client.user.tag} (${client.user.id})`);
-
-    try {
-      await registerSlashCommands(client);
-    } catch (error) {
-      console.error('[HYPNOX] Error durante el registro de slash commands:', error);
-    }
-
-    const servers = [
-      { discord_guild_id: getEnv('OFFICIAL_GUILD_ID'), guild_type: 'official', name: 'Hypnox Studios Official Discord' },
-      { discord_guild_id: getEnv('STAFF_GUILD_ID'), guild_type: 'staff', name: 'Hypnox Studios Staff Team Discord' },
-      { discord_guild_id: getEnv('APPLICATIONS_GUILD_ID'), guild_type: 'applications', name: 'Hypnox Studios Staff Applications Discord' }
-    ];
-    const devGuildId = getEnv('DISCORD_DEV_GUILD_ID') || getEnv('DEV_GUILD_ID');
-    if (devGuildId) servers.push({ discord_guild_id: devGuildId, guild_type: 'dev', name: 'Hypnox Studios Development Server' });
-
-    const validServers = servers.filter((server) => server.discord_guild_id);
-    const { error } = await supabase.from('guilds').upsert(validServers, { onConflict: 'discord_guild_id' });
-    if (error) console.error('[HYPNOX] Error sincronizando servidores:', error.message);
-    else console.log('[HYPNOX] Servidores sincronizados con Supabase.');
-  });
-
-  client.on('error', error => console.error('[HYPNOX] Discord client error:', error));
-  process.on('unhandledRejection', error => console.error('[HYPNOX] Unhandled rejection:', error));
-  process.on('uncaughtException', error => console.error('[HYPNOX] Uncaught exception:', error));
-
+  await verifyDiscordToken();
   await loginWithDiagnostics(client);
 }
 
@@ -224,4 +227,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { bootstrap, registerSlashCommands, registerAutoRoles, registerConnectionDiagnostics, loginWithDiagnostics };
+module.exports = { bootstrap, registerSlashCommands, registerAutoRoles, registerConnectionDiagnostics, verifyDiscordToken, loginWithDiagnostics };
