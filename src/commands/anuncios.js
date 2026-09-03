@@ -40,7 +40,7 @@ async function getAnnouncementChannel(interaction) {
   const guildType = getGuildType(interaction.guild.id);
   const envKey = guildType === 'official' ? 'OFFICIAL_CHANNEL_ANNOUNCEMENTS_ID' : 'STAFF_CHANNEL_ANNOUNCEMENTS_ID';
   const channelId = getEnv(envKey);
-  if (!channelId) return { channel: null, envKey };
+  if (!channelId) return { channel: guildType === 'staff' && interaction.channel?.isTextBased() ? interaction.channel : null, envKey };
   const channel = await interaction.guild.channels.fetch(channelId).catch(() => null);
   return { channel: channel?.isTextBased() ? channel : null, envKey };
 }
