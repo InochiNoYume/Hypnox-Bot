@@ -17,7 +17,7 @@ El bot utiliza una única aplicación de Discord y una única base de datos de S
 - Las respuestas y embeds utilizan una identidad visual negra (`#000000`) y no dependen de nombres de roles.
 - Los registros se almacenan en Supabase y cada servidor utiliza un único canal de logs configurado.
 - `DISCORD_TOKEN` y `SUPABASE_SERVICE_ROLE_KEY` nunca deben publicarse.
-- No existe un dashboard web ni una segunda aplicación que dependa de este repositorio.
+- No existe una aplicación web dependiente del bot.
 
 ## Autoroles
 
@@ -148,8 +148,8 @@ Las migraciones se encuentran en `database/migrations/`.
 - `004_add_dev_guild_type.sql`: habilita el tipo de servidor de desarrollo/pruebas.
 - `20260902040000_harden_logs_and_rls_auto_enable.sql`: corrige categorías de logs, refuerza RLS en proyectos y tareas y restringe la ejecución pública de `rls_auto_enable()`.
 - `20260902050000_add_bugs_ticket_type.sql`: añade `bugs` como tipo válido de ticket.
-- `20260902172603_dashboard_access.sql`: migración histórica de la arquitectura web descartada; ya no forma parte del sistema operativo.
-- `20260902180000_remove_dashboard_access.sql`: elimina la capa histórica de acceso web y sus políticas asociadas.
+- `20260902172603_dashboard_access.sql`: migración histórica de una capa web descartada; se conserva únicamente como historial de migración.
+- `20260903031735_remove_dashboard_access.sql`: elimina esa capa histórica de acceso web y sus políticas asociadas.
 
 Las migraciones históricas ya aplicadas no deben ejecutarse nuevamente de forma ciega sobre una base existente. Primero debe comprobarse el estado real de la base de datos.
 
