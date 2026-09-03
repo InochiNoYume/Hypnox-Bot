@@ -1,4 +1,4 @@
-const { ChannelType, PermissionFlagsBits, ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
+const { ChannelType, PermissionFlagsBits, ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder, ButtonBuilder, ButtonStyle, MessageFlags } = require('discord.js');
 const { getGuildType } = require('../utils/guild');
 const { hasConfiguredRole } = require('../utils/permissions');
 const { getEnv } = require('../config/env');
@@ -8,6 +8,8 @@ const { ensureUser } = require('../services/moderation');
 const supabase = require('../database/supabase');
 const { brandedEmbed } = require('../utils/embeds');
 const { showCloseModal, closeTicketWithReason } = require('../services/ticketClosing');
+
+const EPHEMERAL = MessageFlags.Ephemeral;
 
 const STAFF_ROLE_ENVS = [
   'OFFICIAL_ROLE_FOUNDER_ID', 'OFFICIAL_ROLE_DIRECTOR_ID', 'OFFICIAL_ROLE_ADMINISTRATOR_ID',
@@ -68,7 +70,7 @@ function buildTicketEmbed(type, user, answers) {
   const form = TICKET_FORMS[type];
   const title = type === 'alianza' ? 'ALIANZA / PARTNER' : type === 'bugs' ? 'BUGS / ERRORES' : type.toUpperCase();
   const embed = brandedEmbed(`HYPNOX STUDIOS — ${title}`, 'Tu solicitud ha sido registrada correctamente. El equipo correspondiente revisará la información y responderá en este canal.');
-  embed.addFields({name:'◆ SOLICITANTE',value:`<@${user.id}>`,inline:false}, ...form.questions.map(([id,label]) => ({name:`◆ ${label.toUpperCase()}`,value:answers[id] || 'No proporcionado.',inline:false}),), {name:'◆ ATENCIÓN',value:type === 'bugs' ? 'El reporte será revisado por el equipo de desarrollo y producción. Incluye evidencia y pasos para reproducir el problema siempre que sea posible.' : 'Espera a un miembro del equipo correspondiente. La atención puede demorar dependiendo de la disponibilidad del equipo. Puedes dejar información adicional dentro de este ticket.',inline:false});
+  embed.addFields({name:'◆ SOLICITANTE',value:`<@${user.id}>`,inline:false}, ...form.questions.map(([id,label]) => ({name:`◆ ${label.toUpperCase()}`,value:answers[id] || 'No proporcionado.',inline:false})), {name:'◆ ATENCIÓN',value:type === 'bugs' ? 'El reporte será revisado por el equipo de desarrollo y producción. Incluye evidencia y pasos para reproducir el problema siempre que sea posible.' : 'Espera a un miembro del equipo correspondiente. La atención puede demorar dependiendo de la disponibilidad del equipo. Puedes dejar información adicional dentro de este ticket.',inline:false});
   embed.setFooter({text:'Hypnox Studios • Sistema de atención'});
   return embed;
 }
@@ -81,7 +83,7 @@ function buildTicketButtons() {
 }
 
 async function createTicketFromModal(interaction, type) {
-  await interaction.deferReply({ ephemeral: true });
+  await interaction.deferReply({ flags: EPHEMERAL });
   try {
     const categoryId = getEnv('OFFICIAL_CHANNEL_TICKETS_CATEGORY_ID');
     const category = categoryId ? await interaction.guild.channels.fetch(categoryId).catch(() => null) : null;
@@ -131,59 +133,66 @@ async function hideOtherStaff(interaction, claimedUserId) {
 }
 
 async function claimTicket(interaction) {
-  const ticket = await getTicket(interaction.channelId);
-  if (!ticket) return interaction.reply({content:'Este canal no corresponde a un ticket abierto.',ephemeral:true});
-  if (!memberCanHandleTicket(interaction, ticket)) return interaction.reply({content:'No tienes permiso para reclamar este ticket.',ephemeral:true});
-  if (ticket.assigned_to_discord_user_id) return interaction.reply({content:`Este ticket ya fue reclamado por <@${ticket.assigned_to_discord_user_id}>.`,ephemeral:true});
-  await updateTicket(ticket.id, {assigned_to_discord_user_id:interaction.user.id});
-  await addTicketEvent(ticket.id, interaction.user.id, 'assigned', null, {});
-  await hideOtherStaff(interaction, interaction.user.id);
-  await writeLog({guild:interaction.guild,category:'ticket',action:'claim',actorId:interaction.user.id,channelId:interaction.channelId,message:`Ticket ${ticket.id} reclamado.`});
-  await interaction.channel.send({content:`El ticket ha sido reclamado por <@${interaction.user.id}>.`});
-  return interaction.reply({content:'Has reclamado este ticket. Ahora puedes responder al miembro.',ephemeral:true});
+  await interaction.deferReply({ flags: EPHEMERAL });
+  try {
+    const ticket = await getTicket(interaction.channelId);
+    if (!ticket) return interaction.editReply({content:'Este canal no corresponde a un ticket abierto.'});
+    if (!memberCanHandleTicket(interaction, ticket)) return interaction.editReply({content:'No tienes permiso para reclamar este ticket.'});
+    if (ticket.assigned_to_discord_user_id) return interaction.editReply({content:`Este ticket ya fue reclamado por <@${ticket.assigned_to_discord_user_id}>.`});
+    await updateTicket(ticket.id, {assigned_to_discord_user_id:interaction.user.id});
+    await addTicketEvent(ticket.id, interaction.user.id, 'assigned', null, {});
+    await hideOtherStaff(interaction, interaction.user.id);
+    await writeLog({guild:interaction.guild,category:'ticket',action:'claim',actorId:interaction.user.id,channelId:interaction.channelId,message:`Ticket ${ticket.id} reclamado.`});
+    await interaction.channel.send({content:`El ticket ha sido reclamado por <@${interaction.user.id}>.`});
+    return interaction.editReply({content:'Has reclamado este ticket. Ahora puedes responder al miembro.'});
+  } catch (error) {
+    console.error('[HYPNOX] Ticket claim error:', error);
+    return interaction.editReply({content:'No se pudo reclamar el ticket. El error fue registrado para revisión.'}).catch(() => {});
+  }
 }
 
 function registerEvents(client) {
   client.on('interactionCreate', async (interaction) => {
     try {
       if (interaction.isButton() && interaction.customId.startsWith('hypnox_giveaway:')) {
+        await interaction.deferReply({ flags: EPHEMERAL });
         const id = interaction.customId.split(':')[1];
         const {data:giveaway,error:giveawayError} = await supabase.from('giveaways').select('id,status,ends_at').eq('id',id).maybeSingle();
         if (giveawayError) throw giveawayError;
-        if (!giveaway || giveaway.status !== 'active' || new Date(giveaway.ends_at) <= new Date()) return interaction.reply({content:'Este sorteo ya finalizó.',ephemeral:true});
+        if (!giveaway || giveaway.status !== 'active' || new Date(giveaway.ends_at) <= new Date()) return interaction.editReply({content:'Este sorteo ya finalizó.'});
         const user = await ensureUser(interaction.user); const {error} = await supabase.from('giveaway_entries').insert({giveaway_id:id,user_id:user.id});
-        if (error?.code === '23505') return interaction.reply({content:'Ya estás participando en este sorteo.',ephemeral:true}); if (error) throw error;
-        return interaction.reply({content:'Tu participación fue registrada.',ephemeral:true});
+        if (error?.code === '23505') return interaction.editReply({content:'Ya estás participando en este sorteo.'}); if (error) throw error;
+        return interaction.editReply({content:'Tu participación fue registrada.'});
       }
       if (interaction.isButton() && interaction.customId === 'hypnox_ticket_claim') return claimTicket(interaction);
       if (interaction.isButton() && interaction.customId === 'hypnox_ticket_close') return showCloseModal(interaction);
       if (interaction.isStringSelectMenu() && interaction.customId === 'hypnox_ticket_type') {
-        if (getGuildType(interaction.guildId) !== 'official') return interaction.reply({content:'El sistema de tickets solo está disponible en el servidor oficial.',ephemeral:true});
+        if (getGuildType(interaction.guildId) !== 'official') return interaction.reply({content:'El sistema de tickets solo está disponible en el servidor oficial.',flags:EPHEMERAL});
         const type = interaction.values[0];
-        if (!TICKET_FORMS[type]) return interaction.reply({content:'La categoría de ticket no es válida.',ephemeral:true});
+        if (!TICKET_FORMS[type]) return interaction.reply({content:'La categoría de ticket no es válida.',flags:EPHEMERAL});
         return interaction.showModal(buildTicketModal(type));
       }
       if (interaction.isModalSubmit() && interaction.customId === 'hypnox_ticket_close_modal') {
-        if (getGuildType(interaction.guildId) !== 'official') return interaction.reply({content:'El sistema de tickets solo está disponible en el servidor oficial.',ephemeral:true});
+        if (getGuildType(interaction.guildId) !== 'official') return interaction.reply({content:'El sistema de tickets solo está disponible en el servidor oficial.',flags:EPHEMERAL});
         return closeTicketWithReason(interaction, interaction.fields.getTextInputValue('reason'));
       }
       if (interaction.isModalSubmit() && interaction.customId.startsWith('hypnox_ticket_modal:')) {
-        if (getGuildType(interaction.guildId) !== 'official') return interaction.reply({content:'El sistema de tickets solo está disponible en el servidor oficial.',ephemeral:true});
+        if (getGuildType(interaction.guildId) !== 'official') return interaction.reply({content:'El sistema de tickets solo está disponible en el servidor oficial.',flags:EPHEMERAL});
         const type = interaction.customId.split(':')[1];
-        if (!TICKET_FORMS[type]) return interaction.reply({content:'El formulario de ticket no es válido.',ephemeral:true});
+        if (!TICKET_FORMS[type]) return interaction.reply({content:'El formulario de ticket no es válido.',flags:EPHEMERAL});
         return createTicketFromModal(interaction,type);
       }
       if (!interaction.isChatInputCommand()) return;
       const command = client.commands.get(interaction.commandName);
       if (!command) return;
       const guildType = getGuildType(interaction.guildId);
-      if (!guildType) return interaction.reply({content:'Este servidor no está configurado para Hypnox Bot.',ephemeral:true});
-      if (guildType !== 'dev' && command.guilds && !command.guilds.includes(guildType)) return interaction.reply({content:'Este comando no está disponible en este servidor.',ephemeral:true});
-      if (!commandAccessAllowed(interaction, command, guildType)) return interaction.reply({content:'No tienes permisos para utilizar este comando.',ephemeral:true});
+      if (!guildType) return interaction.reply({content:'Este servidor no está configurado para Hypnox Bot.',flags:EPHEMERAL});
+      if (guildType !== 'dev' && command.guilds && !command.guilds.includes(guildType)) return interaction.reply({content:'Este comando no está disponible en este servidor.',flags:EPHEMERAL});
+      if (!commandAccessAllowed(interaction, command, guildType)) return interaction.reply({content:'No tienes permisos para utilizar este comando.',flags:EPHEMERAL});
       return await command.execute(interaction);
     } catch (error) {
       console.error('[HYPNOX] Interaction error:', error);
-      const payload = {content:'Ocurrió un error al procesar la acción. El error fue registrado para revisión.',ephemeral:true};
+      const payload = {content:'Ocurrió un error al procesar la acción. El error fue registrado para revisión.',flags:EPHEMERAL};
       if (interaction.deferred || interaction.replied) await interaction.followUp(payload).catch(() => {});
       else await interaction.reply(payload).catch(() => {});
     }
