@@ -20,6 +20,36 @@ function getConfiguredGuilds() {
   ].filter(([, guildId]) => guildId);
 }
 
+async function withTimeout(promise, timeoutMs, message) {
+  let timer;
+  try {
+    return await Promise.race([
+      promise,
+      new Promise((_, reject) => {
+        timer = setTimeout(() => reject(new Error(message)), timeoutMs);
+      })
+    ]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
+async function verifySupabaseConnection() {
+  console.log('[HYPNOX] Verificando conexión con Supabase...');
+  const startedAt = Date.now();
+  const { error } = await withTimeout(
+    supabase.from('guilds').select('id').limit(1),
+    15_000,
+    'Supabase no respondió dentro de 15 segundos.'
+  );
+
+  if (error) {
+    throw new Error(`Supabase no está correctamente configurado o accesible: ${error.message}`);
+  }
+
+  console.log(`[HYPNOX] Supabase conectado correctamente (${Date.now() - startedAt} ms).`);
+}
+
 async function registerSlashCommands(client) {
   const commands = [...client.commands.values()];
   const commandErrors = validateCommands(client.commands);
@@ -147,10 +177,11 @@ async function verifyDiscordToken() {
   console.log('[HYPNOX] Verificando credenciales de Discord mediante REST API...');
 
   try {
-    const botUser = await Promise.race([
+    const botUser = await withTimeout(
       rest.get(Routes.user()),
-      new Promise((_, reject) => setTimeout(() => reject(new Error('Discord REST no respondió dentro de 15 segundos.')), 15_000))
-    ]);
+      15_000,
+      'Discord REST no respondió dentro de 15 segundos.'
+    );
 
     if (!botUser?.id) throw new Error('Discord no devolvió la identidad del bot.');
     if (clientId && botUser.id !== clientId) {
@@ -170,27 +201,27 @@ async function verifyDiscordToken() {
 
 async function loginWithDiagnostics(client) {
   const timeoutMs = 45_000;
-  let timer;
 
   console.log('[HYPNOX] Iniciando conexión con Discord Gateway...');
   console.log(`[HYPNOX] Token configurado: ${getEnv('DISCORD_TOKEN') ? 'sí' : 'no'}. Client ID configurado: ${getEnv('DISCORD_CLIENT_ID') ? 'sí' : 'no'}.`);
 
   try {
-    await Promise.race([
+    await withTimeout(
       client.login(getEnv('DISCORD_TOKEN')),
-      new Promise((_, reject) => {
-        timer = setTimeout(() => {
-          reject(new Error(`Discord Gateway no respondió dentro de ${timeoutMs / 1000} segundos. Revisa el token, la conectividad de Wispbyte y el acceso del bot a Discord.`));
-        }, timeoutMs);
-      })
-    ]);
-  } finally {
-    if (timer) clearTimeout(timer);
+      timeoutMs,
+      `Discord Gateway no respondió dentro de ${timeoutMs / 1000} segundos. Revisa el token, la conectividad de Wispbyte y el acceso a intents privilegiados.`
+    );
+    console.log('[HYPNOX] Inicio de sesión solicitado correctamente. Esperando clientReady...');
+  } catch (error) {
+    throw new Error(`No se pudo iniciar sesión en Discord: ${error.message}`);
   }
 }
 
 async function bootstrap() {
   validateEnv();
+  console.log('[HYPNOX] Variables de entorno validadas.');
+  await verifySupabaseConnection();
+
   const client = new Client({
     intents: [
       GatewayIntentBits.Guilds,
@@ -218,6 +249,41 @@ async function bootstrap() {
 
   await verifyDiscordToken();
   await loginWithDiagnostics(client);
+
+  client.once('clientReady', async () => {
+    console.log(`[HYPNOX] CONECTADO COMO ${client.user.tag} (${client.user.id})`);
+
+    try {
+      await registerSlashCommands(client);
+    } catch (error) {
+      console.error('[HYPNOX] Error durante el registro de slash commands:', error);
+    }
+
+    try {
+      const servers = [
+        { discord_guild_id: getEnv('OFFICIAL_GUILD_ID'), guild_type: 'official', name: 'Hypnox Studios Official Discord' },
+        { discord_guild_id: getEnv('STAFF_GUILD_ID'), guild_type: 'staff', name: 'Hypnox Studios Staff Team Discord' },
+        { discord_guild_id: getEnv('APPLICATIONS_GUILD_ID'), guild_type: 'applications', name: 'Hypnox Studios Staff Applications Discord' }
+      ];
+      const devGuildId = getEnv('DISCORD_DEV_GUILD_ID') || getEnv('DEV_GUILD_ID');
+      if (devGuildId) servers.push({ discord_guild_id: devGuildId, guild_type: 'dev', name: 'Hypnox Studios Development Server' });
+
+      const validServers = servers.filter((server) => server.discord_guild_id);
+      const { error } = await withTimeout(
+        supabase.from('guilds').upsert(validServers, { onConflict: 'discord_guild_id' }),
+        15_000,
+        'Supabase no respondió al sincronizar servidores.'
+      );
+      if (error) throw error;
+      console.log('[HYPNOX] Servidores sincronizados con Supabase.');
+    } catch (error) {
+      console.error('[HYPNOX] Error sincronizando servidores con Supabase:', error.message);
+    }
+  });
+
+  client.on('error', error => console.error('[HYPNOX] Discord client error:', error));
+  process.on('unhandledRejection', error => console.error('[HYPNOX] Unhandled rejection:', error));
+  process.on('uncaughtException', error => console.error('[HYPNOX] Uncaught exception:', error));
 }
 
 if (require.main === module) {
@@ -227,4 +293,12 @@ if (require.main === module) {
   });
 }
 
-module.exports = { bootstrap, registerSlashCommands, registerAutoRoles, registerConnectionDiagnostics, verifyDiscordToken, loginWithDiagnostics };
+module.exports = {
+  bootstrap,
+  registerSlashCommands,
+  registerAutoRoles,
+  registerConnectionDiagnostics,
+  verifyDiscordToken,
+  loginWithDiagnostics,
+  verifySupabaseConnection
+};
