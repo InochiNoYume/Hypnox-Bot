@@ -3,6 +3,7 @@ const supabase = require('../database/supabase');
 const { writeLog } = require('../services/logs');
 const { getEnv } = require('../config/env');
 const { getGuildRow } = require('../services/guilds');
+const { getGuildType } = require('../utils/guild');
 const { brandedEmbed, addSection } = require('../utils/embeds');
 
 const TYPES = {
@@ -26,26 +27,23 @@ const data = new SlashCommandBuilder()
   .setName('anuncio')
   .setDescription('Publica una comunicación oficial de Hypnox Studios.')
   .addStringOption((option) => option
-    .setName('tipo')
-    .setDescription('Clasificación de la publicación.')
-    .setRequired(true)
+    .setName('tipo').setDescription('Clasificación de la publicación.').setRequired(true)
     .addChoices(...Object.entries(TYPES).map(([value, config]) => ({ name: config.label, value }))))
   .addStringOption((option) => option
-    .setName('titulo')
-    .setDescription('Título principal de la publicación.')
-    .setMinLength(1)
-    .setMaxLength(180)
-    .setRequired(true))
+    .setName('titulo').setDescription('Título principal de la publicación.').setMinLength(1).setMaxLength(180).setRequired(true))
   .addStringOption((option) => option
-    .setName('contenido')
-    .setDescription('Contenido principal que recibirá la comunidad.')
-    .setMinLength(1)
-    .setMaxLength(3800)
-    .setRequired(true))
+    .setName('contenido').setDescription('Contenido principal que recibirá la comunidad.').setMinLength(1).setMaxLength(3800).setRequired(true))
   .addStringOption((option) => option
-    .setName('imagen')
-    .setDescription('URL de una imagen para acompañar la publicación.')
-    .setMaxLength(1000));
+    .setName('imagen').setDescription('URL de una imagen para acompañar la publicación.').setMaxLength(1000));
+
+async function getAnnouncementChannel(interaction) {
+  const guildType = getGuildType(interaction.guild.id);
+  const envKey = guildType === 'official' ? 'OFFICIAL_CHANNEL_ANNOUNCEMENTS_ID' : 'STAFF_CHANNEL_ANNOUNCEMENTS_ID';
+  const channelId = getEnv(envKey);
+  if (!channelId) return { channel: null, envKey };
+  const channel = await interaction.guild.channels.fetch(channelId).catch(() => null);
+  return { channel: channel?.isTextBased() ? channel : null, envKey };
+}
 
 async function execute(interaction) {
   const guild = await getGuildRow(interaction.guild.id);
@@ -54,49 +52,37 @@ async function execute(interaction) {
   const type = interaction.options.getString('tipo', true);
   const title = interaction.options.getString('titulo', true).trim();
   const content = interaction.options.getString('contenido', true).trim();
-  const image = interaction.options.getString('imagen')?.trim() || getEnv('OFFICIAL_IMAGE_ANNOUNCEMENT');
+  const guildType = getGuildType(interaction.guild.id);
+  const suppliedImage = interaction.options.getString('imagen')?.trim();
+  const image = suppliedImage || (guildType === 'official'
+    ? getEnv('OFFICIAL_IMAGE_ANNOUNCEMENT') || getEnv('OFFICIAL_IMAGE_BANNER')
+    : getEnv('STAFF_IMAGE_ANNOUNCEMENT') || getEnv('STAFF_IMAGE_BANNER'));
   const config = TYPES[type];
 
   if (!config) return interaction.reply({ content: 'El tipo de anuncio no es válido.', ephemeral: true });
-  if (title.length > 180) return interaction.reply({ content: 'El título es demasiado largo.', ephemeral: true });
-  if (content.length > 3800) return interaction.reply({ content: 'El contenido es demasiado largo.', ephemeral: true });
+  const { channel, envKey } = await getAnnouncementChannel(interaction);
+  if (!channel) return interaction.reply({ content: `Configura ${envKey} en el .env antes de publicar anuncios.`, ephemeral: true });
 
-  const embed = brandedEmbed(title, content, {
-    image,
-    footerText: `Hypnox Studios • ${config.label}`
-  });
+  const embed = brandedEmbed(title, content, { image, footerText: `Hypnox Studios • ${config.label}` });
   addSection(embed, 'Clasificación', `**${config.label}**\n${config.description}`);
 
   let message;
   try {
-    message = await interaction.channel.send({ embeds: [embed] });
+    message = await channel.send({ embeds: [embed] });
     const { error } = await supabase.from('announcements').insert({
-      guild_id: guild.id,
-      channel_id: interaction.channel.id,
-      message_id: message.id,
-      announcement_type: type,
-      title,
-      content,
-      image_url: image || null,
+      guild_id: guild.id, channel_id: channel.id, message_id: message.id,
+      announcement_type: type, title, content, image_url: image || null,
       author_discord_user_id: interaction.user.id
     });
     if (error) throw error;
-
-    await writeLog({
-      guild: interaction.guild,
-      category: 'announcement',
-      action: type,
-      actorId: interaction.user.id,
-      channelId: interaction.channel.id,
-      message: title
-    });
+    await writeLog({ guild: interaction.guild, category: 'announcement', action: type, actorId: interaction.user.id, channelId: channel.id, message: title });
   } catch (error) {
     if (message) await message.delete().catch(() => {});
     console.error('[HYPNOX] Announcement error:', error);
     return interaction.reply({ content: 'No se pudo publicar el anuncio. El error fue registrado.', ephemeral: true });
   }
 
-  return interaction.reply({ content: 'Publicación enviada correctamente.', ephemeral: true });
+  return interaction.reply({ content: `Publicación enviada en <#${channel.id}>.`, ephemeral: true });
 }
 
 module.exports = { data, execute, guilds: ['official', 'staff'], access: { roleEnvs: STAFF_ROLES } };
