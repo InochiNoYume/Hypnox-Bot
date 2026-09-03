@@ -25,7 +25,8 @@ const guilds = {
 const logs = {
   official: getEnv('OFFICIAL_LOGS_CHANNEL_ID'),
   staff: getEnv('STAFF_LOGS_CHANNEL_ID'),
-  applications: getEnv('APPLICATIONS_LOGS_CHANNEL_ID')
+  applications: getEnv('APPLICATIONS_LOGS_CHANNEL_ID'),
+  dev: getEnv('DEV_LOGS_CHANNEL_ID')
 };
 
 function getGuildIds() { return guilds; }
