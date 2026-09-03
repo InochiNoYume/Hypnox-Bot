@@ -1,6 +1,6 @@
 require('dotenv').config();
 
-const { Client, GatewayIntentBits, Collection } = require('discord.js');
+const { Client, GatewayIntentBits, Collection, REST } = require('discord.js');
 const { validateEnv, getEnv, getGuildIds } = require('./config/env');
 const { getGuildType } = require('./utils/guild');
 const { validateCommands } = require('./utils/validateCommands');
@@ -48,30 +48,31 @@ async function verifySupabaseConnection() {
 async function registerSlashCommands(client) {
   const commands = loadCommandData();
   const guilds = getConfiguredGuilds();
+  const rest = new REST({ version: '10' }).setToken(getEnv('DISCORD_TOKEN'));
   const failures = [];
-  const rest = require('./deploy-commands').createRestClient
-    ? require('./deploy-commands').createRestClient()
-    : null;
 
-  if (!rest) {
-    const { REST } = require('discord.js');
-    const clientRest = new REST({ version: '10' }).setToken(getEnv('DISCORD_TOKEN'));
-    for (const [guildType, guildId] of guilds) {
-      try {
-        const guild = await withTimeout(client.guilds.fetch(guildId), REQUEST_TIMEOUT_MS, `Discord no respondió al consultar ${guildType}.`);
-        await syncGuildCommands(clientRest, guildType, guildId, commands);
-        console.log(`[HYPNOX][COMMANDS] ${guildType}: ${guild.name} (${guildId}).`);
-      } catch (error) {
-        failures.push(guildType);
-        console.error(`[HYPNOX][COMMANDS] ${guildType} (${guildId}): ${error.message}`);
-      }
+  console.log(`[HYPNOX][COMMANDS] Sincronizando ${guilds.length} guild(s)...`);
+
+  for (const [guildType, guildId] of guilds) {
+    try {
+      const guild = await withTimeout(
+        client.guilds.fetch(guildId),
+        REQUEST_TIMEOUT_MS,
+        `Discord no respondió al consultar ${guildType}.`
+      );
+
+      await syncGuildCommands(rest, guildType, guildId, commands);
+      console.log(`[HYPNOX][COMMANDS] ${guildType}: ${guild.name} (${guildId}) — OK.`);
+    } catch (error) {
+      failures.push(guildType);
+      console.error(`[HYPNOX][COMMANDS] ${guildType} (${guildId}): ${error.message}`);
     }
   }
 
   if (failures.length) {
     console.error(`[HYPNOX][COMMANDS] Sincronización incompleta: ${failures.join(', ')}.`);
   } else {
-    console.log(`[HYPNOX][COMMANDS] Sincronización completada en ${guilds.length} guild(s).`);
+    console.log('[HYPNOX][COMMANDS] Sincronización completada correctamente.');
   }
 
   return { guilds: guilds.length, failures };
