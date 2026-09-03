@@ -12,7 +12,8 @@ async function execute(interaction) {
   const channel = channelId ? await interaction.guild.channels.fetch(channelId).catch(() => null) : null;
   if (!channel?.isTextBased()) return interaction.reply({ content: 'Configura OFFICIAL_CHANNEL_APPLICATIONS_ID antes de cerrar la postulación.', ephemeral: true });
 
-  const embed = brandedEmbed('POSTULACIONES CERRADAS', 'El proceso de incorporación de Staff de Hypnox Studios se encuentra oficialmente cerrado.\n\nAgradecemos a todas las personas que participaron y dedicaron su tiempo al proceso.');
+  const image = getEnv('OFFICIAL_IMAGE_ANNOUNCEMENT') || getEnv('OFFICIAL_IMAGE_BANNER');
+  const embed = brandedEmbed('POSTULACIONES CERRADAS', 'El proceso de incorporación de Staff de Hypnox Studios se encuentra oficialmente cerrado.\n\nAgradecemos a todas las personas que participaron y dedicaron su tiempo al proceso.', { image });
   embed.setFooter({ text: 'Hypnox Studios • Postulaciones de Staff' });
 
   await channel.send({ embeds: [embed] });
@@ -20,4 +21,4 @@ async function execute(interaction) {
   return interaction.reply({ content: `Postulación cerrada en <#${channel.id}>.`, ephemeral: true });
 }
 
-module.exports = { data, execute, guilds: ['official'], access: { roleEnvs: ['OFFICIAL_ROLE_FOUNDER_ID', 'OFFICIAL_ROLE_DIRECTOR_ID', 'OFFICIAL_ROLE_ADMINISTRATOR_ID', 'OFFICIAL_ROLE_SRMOD_ID'] } };
+module.exports = { data, execute, guilds: ['official'], access: { roleEnvs: ['OFFICIAL_ROLE_FOUNDER_ID', 'OFFICIAL_ROLE_DIRECTOR_ID', 'OFFICIAL_ROLE_ADMINISTRATOR_ID'] } };
