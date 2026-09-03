@@ -15,6 +15,15 @@ const TYPES = {
   episodio: { label: 'EPISODIO', description: 'Publicación correspondiente a un nuevo episodio o entrega de una serie.' }
 };
 
+const DB_ANNOUNCEMENT_TYPES = {
+  anuncio: 'official',
+  actividad: 'activity',
+  dinamica: 'dynamic',
+  evento: 'event',
+  serie: 'series',
+  episodio: 'episode'
+};
+
 const STAFF_ROLES = [
   'OFFICIAL_ROLE_FOUNDER_ID', 'OFFICIAL_ROLE_DIRECTOR_ID', 'OFFICIAL_ROLE_ADMINISTRATOR_ID',
   'OFFICIAL_ROLE_SRMOD_ID', 'OFFICIAL_ROLE_MOD_ID', 'OFFICIAL_ROLE_TMOD_ID', 'OFFICIAL_ROLE_HELPER_ID',
@@ -58,8 +67,9 @@ async function execute(interaction) {
     ? getEnv('OFFICIAL_IMAGE_ANNOUNCEMENT') || getEnv('OFFICIAL_IMAGE_BANNER')
     : getEnv('STAFF_IMAGE_ANNOUNCEMENT') || getEnv('STAFF_IMAGE_BANNER'));
   const config = TYPES[type];
+  const dbAnnouncementType = DB_ANNOUNCEMENT_TYPES[type];
 
-  if (!config) return interaction.reply({ content: 'El tipo de anuncio no es válido.', ephemeral: true });
+  if (!config || !dbAnnouncementType) return interaction.reply({ content: 'El tipo de anuncio no es válido.', ephemeral: true });
   const { channel, envKey } = await getAnnouncementChannel(interaction);
   if (!channel) return interaction.reply({ content: `Configura ${envKey} en el .env antes de publicar anuncios.`, ephemeral: true });
 
@@ -71,7 +81,7 @@ async function execute(interaction) {
     message = await channel.send({ embeds: [embed] });
     const { error } = await supabase.from('announcements').insert({
       guild_id: guild.id, channel_id: channel.id, message_id: message.id,
-      announcement_type: type, title, content, image_url: image || null,
+      announcement_type: dbAnnouncementType, title, content, image_url: image || null,
       author_discord_user_id: interaction.user.id
     });
     if (error) throw error;
