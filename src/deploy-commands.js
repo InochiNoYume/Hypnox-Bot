@@ -36,7 +36,12 @@ function loadCommandData() {
 function normalize(value) {
   if (Array.isArray(value)) return value.map(normalize);
   if (value && typeof value === 'object') {
-    return Object.fromEntries(Object.entries(value).sort(([a], [b]) => a.localeCompare(b)).map(([key, val]) => [key, normalize(val)]));
+    return Object.fromEntries(
+      Object.entries(value)
+        .filter(([key]) => !['id', 'application_id', 'guild_id', 'version'].includes(key))
+        .sort(([a], [b]) => a.localeCompare(b))
+        .map(([key, val]) => [key, normalize(val)])
+    );
   }
   return value;
 }
@@ -74,6 +79,26 @@ async function requestWithRetry(request, label) {
   throw new Error(`${label}${status}${code}: ${apiMessage}`);
 }
 
+async function syncGuildCommands(rest, guildType, guildId, commands) {
+  const body = expectedForGuild(commands, guildType);
+  if (guildType !== 'dev' && body.length === 0) {
+    throw new Error(`No hay comandos configurados para la guild ${guildType}.`);
+  }
+
+  const route = Routes.applicationGuildCommands(getEnv('DISCORD_CLIENT_ID'), guildId);
+  const registered = await requestWithRetry(() => rest.get(route), `${guildType} GET`);
+
+  if (commandsEqual(body, registered || [])) {
+    console.log(`[HYPNOX][COMMANDS] ${guildType}: ya está sincronizado (${body.length}).`);
+    return { changed: false, count: body.length };
+  }
+
+  const updated = await requestWithRetry(() => rest.put(route, { body }), `${guildType} PUT`);
+  const count = Array.isArray(updated) ? updated.length : body.length;
+  console.log(`[HYPNOX][COMMANDS] ${guildType}: comandos registrados (${count}).`);
+  return { changed: true, count };
+}
+
 async function deploy() {
   validateEnv();
 
@@ -83,28 +108,7 @@ async function deploy() {
 
   for (const [guildType, guildId] of Object.entries(guildIds)) {
     if (!guildId) continue;
-
-    const body = expectedForGuild(commands, guildType);
-    if (guildType !== 'dev' && body.length === 0) {
-      throw new Error(`No hay comandos configurados para la guild ${guildType}.`);
-    }
-
-    const registered = await requestWithRetry(
-      () => rest.get(Routes.applicationGuildCommands(getEnv('DISCORD_CLIENT_ID'), guildId)),
-      `${guildType} GET`
-    );
-
-    if (commandsEqual(body, registered || [])) {
-      console.log(`[HYPNOX][COMMANDS] ${guildType}: ya está sincronizado (${body.length}).`);
-      continue;
-    }
-
-    const updated = await requestWithRetry(
-      () => rest.put(Routes.applicationGuildCommands(getEnv('DISCORD_CLIENT_ID'), guildId), { body }),
-      `${guildType} PUT`
-    );
-
-    console.log(`[HYPNOX][COMMANDS] ${guildType}: comandos registrados (${Array.isArray(updated) ? updated.length : body.length}).`);
+    await syncGuildCommands(rest, guildType, guildId, commands);
   }
 }
 
@@ -115,4 +119,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { deploy, loadCommandData, expectedForGuild, commandsEqual };
+module.exports = { deploy, loadCommandData, expectedForGuild, commandsEqual, syncGuildCommands };
