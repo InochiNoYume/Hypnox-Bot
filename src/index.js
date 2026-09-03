@@ -111,6 +111,55 @@ function registerAutoRoles(client) {
   });
 }
 
+function registerConnectionDiagnostics(client) {
+  client.on('debug', (message) => {
+    const text = String(message);
+    if (/heartbeat|heartbeat acknowledged/i.test(text)) return;
+    console.log(`[HYPNOX][DISCORD DEBUG] ${text}`);
+  });
+
+  client.on('warn', (message) => {
+    console.warn(`[HYPNOX][DISCORD WARN] ${message}`);
+  });
+
+  client.on('shardError', (error) => {
+    console.error('[HYPNOX][DISCORD SHARD ERROR]', error);
+  });
+
+  client.on('shardDisconnect', (event, shardId) => {
+    console.warn(`[HYPNOX][DISCORD] Shard ${shardId} desconectado. Código ${event?.code ?? 'desconocido'}.`);
+  });
+
+  client.on('shardReconnecting', (shardId) => {
+    console.warn(`[HYPNOX][DISCORD] Shard ${shardId} intentando reconectar...`);
+  });
+
+  client.on('invalidated', () => {
+    console.error('[HYPNOX][DISCORD] La sesión fue invalidada. Será necesario volver a iniciar sesión.');
+  });
+}
+
+async function loginWithDiagnostics(client) {
+  const timeoutMs = 45_000;
+  let timer;
+
+  console.log('[HYPNOX] Iniciando conexión con Discord Gateway...');
+  console.log(`[HYPNOX] Token configurado: ${getEnv('DISCORD_TOKEN') ? 'sí' : 'no'}. Client ID configurado: ${getEnv('DISCORD_CLIENT_ID') ? 'sí' : 'no'}.`);
+
+  try {
+    await Promise.race([
+      client.login(getEnv('DISCORD_TOKEN')),
+      new Promise((_, reject) => {
+        timer = setTimeout(() => {
+          reject(new Error(`Discord Gateway no respondió dentro de ${timeoutMs / 1000} segundos. Revisa el token, la conectividad de Wispbyte y el acceso del bot a Discord.`));
+        }, timeoutMs);
+      })
+    ]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
 async function bootstrap() {
   validateEnv();
   const client = new Client({
@@ -136,11 +185,16 @@ async function bootstrap() {
   registerAutoRoles(client);
   registerWelcome(client);
   configurePresence(client);
+  registerConnectionDiagnostics(client);
 
   client.once('clientReady', async () => {
-    console.log(`[HYPNOX] Conectado como ${client.user.tag} (${client.user.id})`);
+    console.log(`[HYPNOX] CONECTADO COMO ${client.user.tag} (${client.user.id})`);
 
-    await registerSlashCommands(client);
+    try {
+      await registerSlashCommands(client);
+    } catch (error) {
+      console.error('[HYPNOX] Error durante el registro de slash commands:', error);
+    }
 
     const servers = [
       { discord_guild_id: getEnv('OFFICIAL_GUILD_ID'), guild_type: 'official', name: 'Hypnox Studios Official Discord' },
@@ -159,7 +213,8 @@ async function bootstrap() {
   client.on('error', error => console.error('[HYPNOX] Discord client error:', error));
   process.on('unhandledRejection', error => console.error('[HYPNOX] Unhandled rejection:', error));
   process.on('uncaughtException', error => console.error('[HYPNOX] Uncaught exception:', error));
-  await client.login(getEnv('DISCORD_TOKEN'));
+
+  await loginWithDiagnostics(client);
 }
 
 if (require.main === module) {
@@ -169,4 +224,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { bootstrap, registerSlashCommands, registerAutoRoles };
+module.exports = { bootstrap, registerSlashCommands, registerAutoRoles, registerConnectionDiagnostics, loginWithDiagnostics };
