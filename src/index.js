@@ -19,7 +19,7 @@ async function registerSlashCommands(client) {
     ['dev', getEnv('DISCORD_DEV_GUILD_ID') || getEnv('DEV_GUILD_ID')]
   ].filter(([, guildId]) => guildId);
 
-  const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN);
+  const rest = new REST({ version: '10' }).setToken(getEnv('DISCORD_TOKEN'));
 
   for (const [guildType, guildId] of guilds) {
     const body = commands
@@ -28,7 +28,7 @@ async function registerSlashCommands(client) {
 
     try {
       await rest.put(
-        Routes.applicationGuildCommands(process.env.DISCORD_CLIENT_ID, guildId),
+        Routes.applicationGuildCommands(getEnv('DISCORD_CLIENT_ID'), guildId),
         { body }
       );
       console.log(`[HYPNOX] Slash commands registrados en ${guildType}: ${body.length}`);
@@ -112,10 +112,14 @@ async function bootstrap() {
   client.on('error', error => console.error('[HYPNOX] Discord client error:', error));
   process.on('unhandledRejection', error => console.error('[HYPNOX] Unhandled rejection:', error));
   process.on('uncaughtException', error => console.error('[HYPNOX] Uncaught exception:', error));
-  await client.login(process.env.DISCORD_TOKEN);
+  await client.login(getEnv('DISCORD_TOKEN'));
 }
 
-bootstrap().catch(error => {
-  console.error('[HYPNOX] Error iniciando el bot:', error);
-  process.exit(1);
-});
+if (require.main === module) {
+  bootstrap().catch(error => {
+    console.error('[HYPNOX] Error iniciando el bot:', error);
+    process.exit(1);
+  });
+}
+
+module.exports = { bootstrap, registerSlashCommands, registerAutoRoles };
