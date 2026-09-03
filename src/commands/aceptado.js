@@ -24,8 +24,9 @@ async function execute(interaction) {
 
   const users = Array.from({ length: 10 }, (_, index) => interaction.options.getUser(`usuario${index + 1}`)).filter(Boolean);
   const mentions = users.map((user) => `◆ <@${user.id}>`).join('\n');
+  const image = getEnv('APPLICATIONS_IMAGE_RESULTS') || getEnv('OFFICIAL_IMAGE_ANNOUNCEMENT') || getEnv('OFFICIAL_IMAGE_BANNER');
 
-  const embed = brandedEmbed('RESULTADOS DE POSTULACIÓN', 'El proceso de selección ha finalizado. Las siguientes personas han sido aceptadas para formar parte del Staff de Hypnox Studios.');
+  const embed = brandedEmbed('RESULTADOS DE POSTULACIÓN', 'El proceso de selección ha finalizado. Las siguientes personas han sido aceptadas para formar parte del Staff de Hypnox Studios.', { image });
   embed.addFields({ name: 'USUARIOS ACEPTADOS', value: mentions, inline: false });
   embed.setFooter({ text: 'Hypnox Studios • Resultados de Staff' });
 
@@ -34,4 +35,4 @@ async function execute(interaction) {
   return interaction.reply({ content: `Resultado publicado en <#${channel.id}>.`, ephemeral: true });
 }
 
-module.exports = { data, execute, guilds: ['official'], access: { roleEnvs: ['OFFICIAL_ROLE_FOUNDER_ID', 'OFFICIAL_ROLE_DIRECTOR_ID', 'OFFICIAL_ROLE_ADMINISTRATOR_ID', 'OFFICIAL_ROLE_SRMOD_ID'] } };
+module.exports = { data, execute, guilds: ['official'], access: { roleEnvs: ['OFFICIAL_ROLE_FOUNDER_ID', 'OFFICIAL_ROLE_DIRECTOR_ID', 'OFFICIAL_ROLE_ADMINISTRATOR_ID'] } };
