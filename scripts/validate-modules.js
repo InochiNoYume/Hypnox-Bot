@@ -29,4 +29,31 @@ for (const file of files) {
   require(file);
 }
 
-console.log(`[HYPNOX] Module validation OK: ${files.length} archivos cargados.`);
+const commandsPath = path.join(root, 'commands');
+const commandEntries = fs.readdirSync(commandsPath)
+  .filter((file) => file.endsWith('.js'))
+  .map((file) => require(path.join(commandsPath, file)));
+
+const names = new Set();
+const commandErrors = [];
+for (const command of commandEntries) {
+  if (!command?.data?.name || typeof command.execute !== 'function') {
+    commandErrors.push('Comando con estructura inválida.');
+    continue;
+  }
+  const name = command.data.name;
+  if (!/^[a-z0-9_-]{1,32}$/.test(name)) commandErrors.push(`${name}: nombre inválido.`);
+  if (names.has(name)) commandErrors.push(`${name}: comando duplicado.`);
+  names.add(name);
+  try {
+    command.data.toJSON();
+  } catch (error) {
+    commandErrors.push(`${name}: definición inválida (${error.message}).`);
+  }
+}
+
+if (commandErrors.length) {
+  throw new Error(`Validación de comandos fallida: ${commandErrors.join(' | ')}`);
+}
+
+console.log(`[HYPNOX] Module validation OK: ${files.length} archivos cargados; ${commandEntries.length} comandos válidos.`);
