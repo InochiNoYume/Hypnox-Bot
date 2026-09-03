@@ -31,6 +31,19 @@ function validateEnv() {
   const missing = required.filter((key) => !getEnv(key));
   if (missing.length) throw new Error(`Variables de entorno faltantes: ${missing.join(', ')}`);
 
+  const token = getEnv('DISCORD_TOKEN');
+  if (!token || /\s/.test(token)) {
+    throw new Error('DISCORD_TOKEN parece inválido: está vacío o contiene espacios/saltos de línea.');
+  }
+
+  const supabaseUrl = getEnv('SUPABASE_URL');
+  try {
+    const parsed = new URL(supabaseUrl);
+    if (!['http:', 'https:'].includes(parsed.protocol) || !parsed.hostname) throw new Error();
+  } catch {
+    throw new Error('SUPABASE_URL no es una URL válida.');
+  }
+
   const invalidIds = SNOWFLAKE_KEYS
     .map((key) => [key, getEnv(key)])
     .filter(([, value]) => value && !/^\d{17,20}$/.test(String(value)))
