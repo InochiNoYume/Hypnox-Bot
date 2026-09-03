@@ -13,6 +13,14 @@ const STAFF_ROLE_ENVS = [
   'OFFICIAL_ROLE_SRMOD_ID','OFFICIAL_ROLE_MOD_ID','OFFICIAL_ROLE_TMOD_ID','OFFICIAL_ROLE_HELPER_ID'
 ];
 
+const TICKET_ACCESS = {
+  support: ['OFFICIAL_ROLE_FOUNDER_ID','OFFICIAL_ROLE_DIRECTOR_ID','OFFICIAL_ROLE_ADMINISTRATOR_ID','OFFICIAL_ROLE_SRMOD_ID','OFFICIAL_ROLE_MOD_ID','OFFICIAL_ROLE_TMOD_ID','OFFICIAL_ROLE_HELPER_ID'],
+  report: ['OFFICIAL_ROLE_FOUNDER_ID','OFFICIAL_ROLE_DIRECTOR_ID','OFFICIAL_ROLE_ADMINISTRATOR_ID','OFFICIAL_ROLE_SRMOD_ID','OFFICIAL_ROLE_MOD_ID','OFFICIAL_ROLE_TMOD_ID'],
+  alliance_partner: ['OFFICIAL_ROLE_FOUNDER_ID','OFFICIAL_ROLE_DIRECTOR_ID','OFFICIAL_ROLE_ADMINISTRATOR_ID','OFFICIAL_ROLE_SRMOD_ID','OFFICIAL_ROLE_MOD_ID','OFFICIAL_ROLE_TMOD_ID','OFFICIAL_ROLE_HELPER_ID'],
+  contact: ['OFFICIAL_ROLE_FOUNDER_ID','OFFICIAL_ROLE_DIRECTOR_ID','OFFICIAL_ROLE_ADMINISTRATOR_ID'],
+  bugs: ['OFFICIAL_ROLE_FOUNDER_ID','OFFICIAL_ROLE_DIRECTOR_ID','OFFICIAL_ROLE_ADMINISTRATOR_ID','OFFICIAL_ROLE_DEVELOPER_ID','OFFICIAL_ROLE_PRODUCER_ID']
+};
+
 const data = new SlashCommandBuilder().setName('tickets').setDescription('Gestiona el sistema de atención del servidor oficial.')
   .addSubcommand((s)=>s.setName('panel').setDescription('Publica el panel de atención.'))
   .addSubcommand((s)=>s.setName('cerrar').setDescription('Solicita el motivo y cierra el ticket actual.'))
@@ -23,6 +31,7 @@ const data = new SlashCommandBuilder().setName('tickets').setDescription('Gestio
 const labels = { soporte:'Soporte', reporte:'Reporte', alianza:'Alianza / Partner', contacto:'Contacto', bugs:'Bugs / Errores' };
 const select = () => new ActionRowBuilder().addComponents(new StringSelectMenuBuilder().setCustomId('hypnox_ticket_type').setPlaceholder('Selecciona el área que necesitas').addOptions(Object.entries(labels).map(([value,label])=>({label,value,description:`Abrir una solicitud de ${label.toLowerCase()}`}))));
 function isStaff(i){return STAFF_ROLE_ENVS.some((env)=>hasConfiguredRole(i.member,env));}
+function canHandleTicket(i,ticket){const roles=TICKET_ACCESS[ticket?.ticket_type]||[];return roles.some((env)=>hasConfiguredRole(i.member,env));}
 
 async function hideStaffFromTicket(channel, claimedUserId){
   for(const env of STAFF_ROLE_ENVS){const roleId=getEnv(env);if(!roleId || !channel.guild.roles.cache.has(roleId))continue;await channel.permissionOverwrites.edit(roleId,{ViewChannel:false,SendMessages:false,ReadMessageHistory:false}).catch(()=>{});}
@@ -53,9 +62,12 @@ async function execute(i){
   const ticket=await getTicket(i.channel.id);if(!ticket)return i.reply({content:'Este canal no es un ticket activo.',ephemeral:true});
   const creatorDiscordId=await getTicketCreatorDiscordId(ticket);
 
-  if(sub==='cerrar') return showCloseModal(i);
+  if(sub==='cerrar'){
+    if(!canHandleTicket(i,ticket))return i.reply({content:'Solo el Staff autorizado para este tipo de ticket puede cerrarlo.',ephemeral:true});
+    return showCloseModal(i);
+  }
 
-  if(!isStaff(i))return i.reply({content:'Esta acción es exclusiva del Staff.',ephemeral:true});
+  if(!canHandleTicket(i,ticket))return i.reply({content:'No tienes permiso para gestionar este tipo de ticket.',ephemeral:true});
   if(sub==='claim'){
     if(ticket.assigned_to_discord_user_id)return i.reply({content:`Este ticket ya fue reclamado por <@${ticket.assigned_to_discord_user_id}>.`,ephemeral:true});
     await updateTicket(ticket.id,{assigned_to_discord_user_id:i.user.id});
