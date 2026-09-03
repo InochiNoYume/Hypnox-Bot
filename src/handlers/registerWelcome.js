@@ -1,22 +1,22 @@
 const { buildWelcomeEmbed } = require('../services/welcome');
+const { getEnv } = require('../config/env');
+const { getGuildType } = require('../utils/guild');
 
 function registerWelcome(client) {
   client.on('guildMemberAdd', async (member) => {
-    const guildId = member.guild.id;
-    const isStaff = guildId === process.env.STAFF_GUILD_ID;
-    const isApplications = guildId === process.env.APPLICATIONS_GUILD_ID;
-    if (!isStaff && !isApplications) return;
+    const guildType = getGuildType(member.guild.id);
+    if (guildType !== 'staff' && guildType !== 'applications') return;
 
-    const channelId = isStaff
-      ? process.env.STAFF_CHANNEL_WELCOME_ID
-      : process.env.APPLICATIONS_CHANNEL_WELCOME_ID;
+    const channelId = guildType === 'staff'
+      ? getEnv('STAFF_CHANNEL_WELCOME_ID')
+      : getEnv('APPLICATIONS_CHANNEL_WELCOME_ID');
     if (!channelId) return;
 
-    const channel = member.guild.channels.cache.get(channelId);
+    const channel = await member.guild.channels.fetch(channelId).catch(() => null);
     if (!channel?.isTextBased()) return;
 
     try {
-      await channel.send({ embeds: [buildWelcomeEmbed(member, isStaff ? 'staff' : 'applications')] });
+      await channel.send({ embeds: [buildWelcomeEmbed(member, guildType)] });
     } catch (error) {
       console.error(`[HYPNOX] No se pudo enviar bienvenida en ${member.guild.name}:`, error.message);
     }
