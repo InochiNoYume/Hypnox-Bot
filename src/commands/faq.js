@@ -1,7 +1,8 @@
-const { SlashCommandBuilder } = require('discord.js');
+const { SlashCommandBuilder, MessageFlags } = require('discord.js');
 const { getEnv } = require('../config/env');
 const { brandedEmbed } = require('../utils/embeds');
 
+const EPHEMERAL = MessageFlags.Ephemeral;
 const STAFF = ['OFFICIAL_ROLE_FOUNDER_ID', 'OFFICIAL_ROLE_DIRECTOR_ID', 'OFFICIAL_ROLE_ADMINISTRATOR_ID'];
 const isAdmin = (member) => STAFF.some((env) => { const id = getEnv(env); return id && member?.roles?.cache?.has(id); });
 
@@ -11,10 +12,10 @@ module.exports = {
     .setDescription('Publica las preguntas frecuentes del Discord oficial.'),
 
   async execute(interaction) {
-    if (!isAdmin(interaction.member)) return interaction.reply({ content: 'No tienes permisos para publicar las preguntas frecuentes.', ephemeral: true });
+    if (!isAdmin(interaction.member)) return interaction.reply({ content: 'No tienes permisos para publicar las preguntas frecuentes.', flags: EPHEMERAL });
     const channelId = getEnv('OFFICIAL_CHANNEL_FAQ_ID');
     const channel = channelId ? await interaction.guild.channels.fetch(channelId).catch(() => null) : null;
-    if (!channel?.isTextBased()) return interaction.reply({ content: 'Configura OFFICIAL_CHANNEL_FAQ_ID en el entorno del bot.', ephemeral: true });
+    if (!channel?.isTextBased()) return interaction.reply({ content: 'Configura OFFICIAL_CHANNEL_FAQ_ID en el entorno del bot.', flags: EPHEMERAL });
 
     const embed = brandedEmbed('PREGUNTAS FRECUENTES', 'Centro de información de Hypnox Studios. Aquí encontrarás respuestas a las consultas más habituales sobre la comunidad, nuestras actividades y nuestros sistemas.', {
       footerText: 'Hypnox Studios • Centro de información'
@@ -34,7 +35,7 @@ module.exports = {
     );
 
     await channel.send({ embeds: [embed] });
-    return interaction.reply({ content: `Preguntas frecuentes publicadas en <#${channel.id}>.`, ephemeral: true });
+    return interaction.reply({ content: `Preguntas frecuentes publicadas en <#${channel.id}>.`, flags: EPHEMERAL });
   },
 
   guilds: ['official']
