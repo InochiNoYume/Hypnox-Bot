@@ -56,12 +56,16 @@ function createPrefixOptions(message, command, subcommand, args) {
       const parsed = Number(value);
       optionValues[definition.name] = Number.isFinite(parsed) ? parsed : null;
     } else if (type === 5) {
-      optionValues[definition.name] = value == null ? null : ['true', 'sí', 'si', '1', 'yes'].includes(String(value).toLowerCase());
+      optionValues[definition.name] = value == null
+        ? null
+        : ['true', 'sí', 'si', '1', 'yes'].includes(String(value).toLowerCase());
     } else {
       optionValues[definition.name] = value ?? null;
     }
 
-    positionalIndex += isLastDefinition && type === 3 ? Math.max(args.length - positionalIndex, 1) : 1;
+    positionalIndex += isLastDefinition && type === 3
+      ? Math.max(args.length - positionalIndex, 1)
+      : 1;
   }
 
   const getRaw = (name) => optionValues[name] ?? null;
@@ -82,9 +86,13 @@ function createPrefixOptions(message, command, subcommand, args) {
     },
     getUser: (name) => {
       const id = getRaw(name);
-      return id ? message.guild.members.cache.get(id)?.user || { id } : null;
+      return id
+        ? message.guild.members.cache.get(id)?.user || message.client.users.cache.get(id) || { id }
+        : null;
     },
-    getUsers: () => extractUserIds(args.join(' ')).map((id) => message.guild.members.cache.get(id)?.user || { id }),
+    getUsers: () => extractUserIds(args.join(' ')).map(
+      (id) => message.guild.members.cache.get(id)?.user || message.client.users.cache.get(id) || { id }
+    ),
     getChannel: (name) => {
       const id = getRaw(name);
       return id ? message.guild.channels.cache.get(id) || { id } : null;
@@ -109,11 +117,31 @@ function createPrefixInteraction(message, command, commandName, args) {
     ? requestedSubcommand
     : null;
   const optionArgs = subcommand ? args.slice(1) : args;
+  const state = { replied: false, deferred: false, replyMessage: null };
 
-  const state = { replied: false, deferred: false };
   const reply = async (payload) => {
+    const sent = await message.reply(payload);
     state.replied = true;
-    return message.reply(payload);
+    state.replyMessage = sent;
+    return sent;
+  };
+
+  const followUp = async (payload) => {
+    const sent = await message.channel.send(payload);
+    state.replyMessage = state.replyMessage || sent;
+    return sent;
+  };
+
+  const editReply = async (payload) => {
+    if (state.replyMessage?.editable) return state.replyMessage.edit(payload);
+    return reply(payload);
+  };
+
+  const deleteReply = async () => {
+    if (state.replyMessage?.deletable) {
+      await state.replyMessage.delete().catch(() => {});
+      state.replyMessage = null;
+    }
   };
 
   return {
@@ -128,9 +156,10 @@ function createPrefixInteraction(message, command, commandName, args) {
     get replied() { return state.replied; },
     get deferred() { return state.deferred; },
     reply,
-    followUp: reply,
+    followUp,
     deferReply: async () => { state.deferred = true; },
-    editReply: reply
+    editReply,
+    deleteReply
   };
 }
 
