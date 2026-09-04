@@ -25,32 +25,33 @@ function createPrefixOptions(message, command, subcommand, args) {
   const definitions = getOptionDefinitions(command, subcommand);
   const optionValues = {};
   let positionalIndex = 0;
+  const rawArgs = args.map(String);
 
   for (let index = 0; index < definitions.length; index += 1) {
     const definition = definitions[index];
     const type = definition.type;
 
     if (type === 6) {
-      const ids = extractUserIds(args.join(' '));
+      const ids = extractUserIds(rawArgs.join(' '));
       optionValues[definition.name] = ids[positionalIndex] || null;
       positionalIndex += 1;
       continue;
     }
 
     if (type === 7) {
-      optionValues[definition.name] = extractChannelId(args.join(' '));
+      optionValues[definition.name] = extractChannelId(rawArgs.join(' '));
       continue;
     }
 
     if (type === 8) {
-      optionValues[definition.name] = extractRoleId(args.join(' '));
+      optionValues[definition.name] = extractRoleId(rawArgs.join(' '));
       continue;
     }
 
     const isLastDefinition = index === definitions.length - 1;
     const value = isLastDefinition && type === 3
-      ? args.slice(positionalIndex).join(' ')
-      : args[positionalIndex];
+      ? rawArgs.slice(positionalIndex).join(' ')
+      : rawArgs[positionalIndex];
 
     if (type === 4 || type === 10) {
       const parsed = Number(value);
@@ -64,7 +65,7 @@ function createPrefixOptions(message, command, subcommand, args) {
     }
 
     positionalIndex += isLastDefinition && type === 3
-      ? Math.max(args.length - positionalIndex, 1)
+      ? Math.max(rawArgs.length - positionalIndex, 1)
       : 1;
   }
 
@@ -90,7 +91,7 @@ function createPrefixOptions(message, command, subcommand, args) {
         ? message.guild.members.cache.get(id)?.user || message.client.users.cache.get(id) || { id }
         : null;
     },
-    getUsers: () => extractUserIds(args.join(' ')).map(
+    getUsers: () => extractUserIds(rawArgs.join(' ')).map(
       (id) => message.guild.members.cache.get(id)?.user || message.client.users.cache.get(id) || { id }
     ),
     getChannel: (name) => {
@@ -154,9 +155,14 @@ function createPrefixInteraction(message, command, commandName, args) {
     channel: message.channel,
     channelId: message.channel.id,
     message,
+    client: message.client,
     options: createPrefixOptions(message, command, subcommand, optionArgs),
     get replied() { return state.replied; },
     get deferred() { return state.deferred; },
+    isChatInputCommand: () => false,
+    isButton: () => false,
+    isStringSelectMenu: () => false,
+    isModalSubmit: () => false,
     reply,
     followUp,
     deferReply: async () => { state.deferred = true; },
@@ -181,19 +187,24 @@ async function handlePrefixMessage(client, message) {
   const parts = raw.split(/\s+/);
   const commandName = parts.shift().toLowerCase();
   const command = client.commands.get(commandName);
-  if (!command) return;
+  if (!command) {
+    console.log(`[HYPNOX][PREFIX] Comando no encontrado: ${commandName}`);
+    return;
+  }
 
   const guildType = getGuildType(message.guild.id);
   if (!guildType || (guildType !== 'dev' && !(command.guilds || ['official', 'staff', 'applications']).includes(guildType))) {
-    return message.reply('Este comando no está disponible en este servidor.');
+    return message.reply('Este comando no está disponible en este servidor.').catch(() => {});
   }
 
   if (!canUseCommand({ member: message.member }, command, guildType)) {
-    return message.reply('No tienes el rol necesario para usar este comando.');
+    return message.reply('No tienes el rol necesario para usar este comando.').catch(() => {});
   }
 
+  console.log(`[HYPNOX][PREFIX] Ejecutando H!${commandName}${parts.length ? ' (con argumentos)' : ''} en ${message.guild.id}.`);
   const interaction = createPrefixInteraction(message, command, commandName, parts);
   await command.execute(interaction, client);
+  console.log(`[HYPNOX][PREFIX] H!${commandName} procesado correctamente.`);
 }
 
 function registerPrefix(client) {
