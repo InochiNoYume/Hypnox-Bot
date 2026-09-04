@@ -1,11 +1,12 @@
+require('./loadEnv')();
+
 const required = [
   'DISCORD_TOKEN',
   'DISCORD_CLIENT_ID',
   'OFFICIAL_GUILD_ID',
   'STAFF_GUILD_ID',
   'APPLICATIONS_GUILD_ID',
-  'SUPABASE_URL',
-  'SUPABASE_SERVICE_ROLE_KEY'
+  'SUPABASE_URL'
 ];
 
 const DISCORD_ID_PATTERN = /^\d{17,20}$/;
@@ -14,6 +15,26 @@ function getEnv(key, fallback = undefined) {
   const value = process.env[key];
   if (value === undefined || value === null) return fallback;
   return typeof value === 'string' ? value.trim() : value;
+}
+
+function getSupabaseKey() {
+  const direct = getEnv('SUPABASE_SECRET_KEY') || getEnv('SUPABASE_SERVICE_ROLE_KEY');
+  if (direct && !String(direct).startsWith('encrypted:')) return direct;
+
+  const rawKeys = getEnv('SUPABASE_SECRET_KEYS');
+  if (rawKeys && !String(rawKeys).startsWith('encrypted:')) {
+    try {
+      const parsed = JSON.parse(rawKeys);
+      if (parsed && typeof parsed === 'object') {
+        const defaultKey = parsed.default;
+        if (typeof defaultKey === 'string' && defaultKey.trim()) return defaultKey.trim();
+      }
+    } catch {
+      // Invalid optional JSON; validation below will report the missing usable key.
+    }
+  }
+
+  return undefined;
 }
 
 function getDiscordIdKeys() {
@@ -25,6 +46,11 @@ function getDiscordIdKeys() {
 function validateEnv() {
   const missing = required.filter((key) => !getEnv(key));
   if (missing.length) throw new Error(`Variables de entorno faltantes: ${missing.join(', ')}`);
+
+  const supabaseKey = getSupabaseKey();
+  if (!supabaseKey) {
+    throw new Error('Falta una clave de servidor de Supabase. Configura SUPABASE_SECRET_KEY (preferida) o SUPABASE_SERVICE_ROLE_KEY.');
+  }
 
   const token = getEnv('DISCORD_TOKEN');
   if (!token || /\s/.test(token)) {
@@ -77,4 +103,4 @@ function getGuildIds() {
   return guilds;
 }
 
-module.exports = { validateEnv, getEnv, getGuildIds, guilds, logs };
+module.exports = { validateEnv, getEnv, getSupabaseKey, getGuildIds, guilds, logs };
