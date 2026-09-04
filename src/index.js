@@ -254,8 +254,16 @@ async function syncGuildsToSupabase(client) {
 async function handleClientReady(client) {
   console.log(`[HYPNOX][READY] CONECTADO COMO ${client.user.tag} (${client.user.id})`);
 
-  try { await registerSlashCommands(client); }
-  catch (error) { console.error('[HYPNOX][COMMANDS] ERROR:', error.message); }
+  const syncOnReady = getEnv('SYNC_COMMANDS_ON_READY', 'false').toLowerCase() === 'true';
+  if (syncOnReady) {
+    try {
+      await registerSlashCommands(client);
+    } catch (error) {
+      console.error('[HYPNOX][COMMANDS] ERROR:', error.message);
+    }
+  } else {
+    console.log('[HYPNOX][COMMANDS] Sincronización automática omitida; el Gateway no depende de REST.');
+  }
 
   try { await syncGuildsToSupabase(client); }
   catch (error) { console.error('[HYPNOX][SUPABASE] Error sincronizando servidores:', error.message); }
