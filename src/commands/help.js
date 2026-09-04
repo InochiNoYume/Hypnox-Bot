@@ -13,7 +13,7 @@ const CATEGORIES = {
   premios: { title: 'PREMIOS', description: 'Gestión de sorteos, premios, ganadores y entregas.', guilds: ['official', 'staff'] },
   postulaciones: { title: 'POSTULACIONES', description: 'Gestión de convocatorias y publicación de información, requisitos, estados y resultados del proceso de incorporación de Staff.', guilds: ['official', 'applications'] },
   proyectos: { title: 'PROYECTOS', description: 'Gestión interna de proyectos, responsables, estados y planificación.', guilds: ['staff'] },
-  administracion: { title: 'ADMINISTRACIÓN', description: 'Configuración avanzada del bot y parámetros internos de cada servidor.', guilds: ['official', 'staff', 'applications'] }
+  administracion: { title: 'ADMINISTRACIÓN', description: 'Configuración avanzada del bot, auditoría y parámetros internos de cada servidor.', guilds: ['official', 'staff', 'applications'] }
 };
 
 const COMMANDS = {
@@ -26,7 +26,7 @@ const COMMANDS = {
   premios: ['/premio crear', '/premio finalizar', '/premio reroll', '/premio entregar'],
   postulaciones: ['/abierto', '/cerrado', '/aceptado', '/requisitos', '/informacion', '/postular', '/resultado', '/estado-postulacion', '/reglamento-interno'],
   proyectos: ['/proyecto crear', '/proyecto editar', '/proyecto estado', '/proyecto cerrar', '/proyecto asignar'],
-  administracion: ['/administracion config', '/administracion set-channel', '/administracion set-role', '/administracion set-permission', '/administracion maintenance', '/administracion reload']
+  administracion: ['/administracion config', '/administracion set-channel', '/administracion set-role', '/administracion set-permission', '/administracion maintenance', '/administracion reload', '/auditoria usuario']
 };
 
 const data = new SlashCommandBuilder()
