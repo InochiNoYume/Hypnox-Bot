@@ -4,12 +4,26 @@ const supabase = require('../database/supabase');
 
 let schedulerRunning = false;
 const processingIds = new Set();
+const STALE_PROCESSING_MS = 10 * 60 * 1000;
+
+async function releaseStaleAnnouncements() {
+  const cutoff = new Date(Date.now() - STALE_PROCESSING_MS).toISOString();
+  const { error } = await supabase
+    .from('scheduled_announcements')
+    .update({ status: 'pending', processing_at: null })
+    .eq('status', 'processing')
+    .lt('processing_at', cutoff);
+
+  if (error) console.error('[HYPNOX] Scheduler: no se pudieron liberar anuncios bloqueados:', error.message);
+}
 
 async function processScheduledAnnouncements(client) {
   if (schedulerRunning) return;
   schedulerRunning = true;
 
   try {
+    await releaseStaleAnnouncements();
+
     const now = new Date().toISOString();
     const { data: rows, error } = await supabase
       .from('scheduled_announcements')
@@ -29,15 +43,17 @@ async function processScheduledAnnouncements(client) {
       processingIds.add(row.id);
 
       try {
+        const processingAt = new Date().toISOString();
         const { data: claim, error: claimError } = await supabase
           .from('scheduled_announcements')
-          .update({ status: 'pending' })
+          .update({ status: 'processing', processing_at: processingAt })
           .eq('id', row.id)
           .eq('status', 'pending')
-          .select('id')
+          .select('*')
           .maybeSingle();
 
-        if (claimError || !claim) continue;
+        if (claimError) throw claimError;
+        if (!claim) continue;
 
         const { data: guildRow, error: guildError } = await supabase
           .from('guilds')
@@ -61,9 +77,9 @@ async function processScheduledAnnouncements(client) {
 
         const { error: sentError } = await supabase
           .from('scheduled_announcements')
-          .update({ status: 'sent', sent_at: new Date().toISOString() })
+          .update({ status: 'sent', sent_at: new Date().toISOString(), processing_at: null })
           .eq('id', row.id)
-          .eq('status', 'pending');
+          .eq('status', 'processing');
         if (sentError) throw sentError;
 
         if (guild) {
@@ -80,9 +96,9 @@ async function processScheduledAnnouncements(client) {
       } catch (error) {
         await supabase
           .from('scheduled_announcements')
-          .update({ status: 'failed' })
+          .update({ status: 'failed', processing_at: null })
           .eq('id', row.id)
-          .eq('status', 'pending')
+          .eq('status', 'processing')
           .catch(() => {});
         console.error(`[HYPNOX] Scheduled announcement ${row.id}:`, error.message);
       } finally {
