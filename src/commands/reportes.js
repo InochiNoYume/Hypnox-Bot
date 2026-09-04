@@ -6,7 +6,7 @@ const { brandedEmbed } = require('../utils/embeds');
 
 const data = new SlashCommandBuilder().setName('reportes').setDescription('Gestiona reportes internos de usuarios.')
   .addSubcommand(s=>s.setName('crear').setDescription('Crea un reporte interno.').addUserOption(o=>o.setName('usuario').setDescription('Usuario reportado.').setRequired(true)).addStringOption(o=>o.setName('motivo').setDescription('Motivo.').setMinLength(3).setMaxLength(1000).setRequired(true)))
-  .addSubcommand(s=>s.setName('lista').setDescription('Lista reportes pendientes.').setDefaultMemberPermissions(PermissionFlagsBits.ModerateMembers))
+  .addSubcommand(s=>s.setName('lista').setDescription('Lista reportes pendientes.'))
   .addSubcommand(s=>s.setName('ver').setDescription('Consulta un reporte.').addStringOption(o=>o.setName('id').setDescription('ID del reporte.').setRequired(true)))
   .addSubcommand(s=>s.setName('resolver').setDescription('Resuelve un reporte.').addStringOption(o=>o.setName('id').setDescription('ID.').setRequired(true)).addStringOption(o=>o.setName('resolucion').setDescription('Resolución.').setMaxLength(1000).setRequired(true)))
   .addSubcommand(s=>s.setName('rechazar').setDescription('Rechaza un reporte.').addStringOption(o=>o.setName('id').setDescription('ID.').setRequired(true)).addStringOption(o=>o.setName('resolucion').setDescription('Motivo.').setMaxLength(1000).setRequired(true)));
