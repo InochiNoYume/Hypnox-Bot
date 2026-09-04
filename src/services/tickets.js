@@ -111,6 +111,19 @@ async function updateTicket(id, patch) {
   return data;
 }
 
+async function claimTicketAtomic(id, discordUserId) {
+  const { data, error } = await supabase
+    .from('tickets')
+    .update({ assigned_to_discord_user_id: discordUserId })
+    .eq('id', id)
+    .eq('status', 'open')
+    .is('assigned_to_discord_user_id', null)
+    .select()
+    .maybeSingle();
+  if (error) throw error;
+  return data;
+}
+
 async function addTicketEvent(ticketId, actorId, eventType, content = null, metadata = {}) {
   const { error } = await supabase.from('ticket_events').insert({
     ticket_id: ticketId,
@@ -127,5 +140,6 @@ module.exports = {
   getTicket,
   getTicketCreatorDiscordId,
   updateTicket,
+  claimTicketAtomic,
   addTicketEvent
 };
