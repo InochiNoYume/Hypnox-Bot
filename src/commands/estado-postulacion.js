@@ -1,6 +1,8 @@
-const { SlashCommandBuilder } = require('discord.js');
+const { SlashCommandBuilder, MessageFlags } = require('discord.js');
 const { getGuildType } = require('../utils/guild');
 const { isAdminOrHigher, getConfiguredChannel, accessDenied, missingChannel, base } = require('../utils/postulacionesPanels');
+
+const EPHEMERAL = MessageFlags.Ephemeral;
 
 const data = new SlashCommandBuilder()
   .setName('estado-postulacion')
@@ -21,10 +23,10 @@ const data = new SlashCommandBuilder()
     .setRequired(false));
 
 async function execute(interaction) {
-  if (getGuildType(interaction.guildId) !== 'applications') return interaction.reply({ content: 'Este comando solo está disponible en el Discord Staff Applications.', ephemeral: true });
-  if (!isAdminOrHigher(interaction.member)) return interaction.reply({ content: accessDenied(), ephemeral: true });
+  if (getGuildType(interaction.guildId) !== 'applications') return interaction.reply({ content: 'Este comando solo está disponible en el Discord Staff Applications.', flags: EPHEMERAL });
+  if (!isAdminOrHigher(interaction.member)) return interaction.reply({ content: accessDenied(), flags: EPHEMERAL });
   const { channel, envKey } = await getConfiguredChannel(interaction, 'estado');
-  if (!channel) return interaction.reply({ content: missingChannel(envKey || 'APPLICATIONS_CHANNEL_STATUS_ID'), ephemeral: true });
+  if (!channel) return interaction.reply({ content: missingChannel(envKey || 'APPLICATIONS_CHANNEL_STATUS_ID'), flags: EPHEMERAL });
 
   const status = interaction.options.getString('estado', true);
   const detail = interaction.options.getString('detalle');
@@ -34,7 +36,7 @@ async function execute(interaction) {
   embed.addFields({ name: '◆ FUENTE OFICIAL', value: 'Este mensaje corresponde al estado publicado oficialmente por Hypnox Studios. Revisa este canal para futuras actualizaciones.', inline: false });
   embed.setFooter({ text: 'Hypnox Studios • Estado de Postulación' });
   await channel.send({ embeds: [embed] });
-  return interaction.reply({ content: `Estado publicado en <#${channel.id}>.`, ephemeral: true });
+  return interaction.reply({ content: `Estado publicado en <#${channel.id}>.`, flags: EPHEMERAL });
 }
 
 module.exports = { data, execute, guilds: ['applications'] };
