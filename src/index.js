@@ -306,10 +306,20 @@ async function bootstrap() {
       GatewayIntentBits.MessageContent
     ],
     ws: {
-      shardCount: 1,
-      fetchGatewayInformation: async () => gatewayInformation
+      shardCount: 1
     }
   });
+
+  // discord.js Client reconstruye ws.fetchGatewayInformation() al crear el manager,
+  // sobrescribiendo el callback recibido en ClientOptions. Por eso el override debe
+  // hacerse sobre el manager ya construido y antes de client.login().
+  if (client.ws?.options) {
+    client.ws.options.shardCount = 1;
+    client.ws.options.fetchGatewayInformation = async () => gatewayInformation;
+    console.log('[HYPNOX][GATEWAY] Información del Gateway HTTP override configurada.');
+  } else {
+    throw new Error('No se pudo acceder al WebSocketManager de discord.js para configurar el Gateway.');
+  }
 
   client.commands = new Collection();
   loadCommands(client);
