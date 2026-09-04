@@ -1,7 +1,8 @@
-const { SlashCommandBuilder } = require('discord.js');
+const { SlashCommandBuilder, MessageFlags } = require('discord.js');
 const { getEnv } = require('../config/env');
 const { brandedEmbed } = require('../utils/embeds');
 
+const EPHEMERAL = MessageFlags.Ephemeral;
 const STAFF = ['APPLICATIONS_ROLE_FOUNDER_ID', 'APPLICATIONS_ROLE_DIRECTOR_ID', 'APPLICATIONS_ROLE_ADMINISTRATOR_ID'];
 const isAdmin = (member) => STAFF.some((env) => { const id = getEnv(env); return id && member?.roles?.cache?.has(id); });
 
@@ -11,10 +12,10 @@ module.exports = {
     .setDescription('Publica el proceso oficial de selección de Staff.'),
 
   async execute(interaction) {
-    if (!isAdmin(interaction.member)) return interaction.reply({ content: 'No tienes permisos para publicar el proceso de selección.', ephemeral: true });
+    if (!isAdmin(interaction.member)) return interaction.reply({ content: 'No tienes permisos para publicar el proceso de selección.', flags: EPHEMERAL });
     const channelId = getEnv('APPLICATIONS_CHANNEL_SELECTION_ID');
     const channel = channelId ? await interaction.guild.channels.fetch(channelId).catch(() => null) : null;
-    if (!channel?.isTextBased()) return interaction.reply({ content: 'Configura APPLICATIONS_CHANNEL_SELECTION_ID en el entorno del bot.', ephemeral: true });
+    if (!channel?.isTextBased()) return interaction.reply({ content: 'Configura APPLICATIONS_CHANNEL_SELECTION_ID en el entorno del bot.', flags: EPHEMERAL });
 
     const embed = brandedEmbed('PROCESO DE SELECCIÓN', 'Proceso oficial de incorporación al equipo de Hypnox Studios. La evaluación busca identificar a las personas que mejor se adapten a las necesidades, responsabilidades y valores actuales del proyecto.', {
       footerText: 'Hypnox Studios • Staff Applications • Selección'
@@ -33,7 +34,7 @@ module.exports = {
     );
 
     await channel.send({ embeds: [embed] });
-    return interaction.reply({ content: `Proceso de selección publicado en <#${channel.id}>.`, ephemeral: true });
+    return interaction.reply({ content: `Proceso de selección publicado en <#${channel.id}>.`, flags: EPHEMERAL });
   },
 
   guilds: ['applications']
