@@ -73,11 +73,8 @@ async function registerSlashCommands(client) {
     }
   }
 
-  if (failures.length) {
-    console.error(`[HYPNOX][COMMANDS] Sincronización incompleta: ${failures.join(', ')}.`);
-  } else {
-    console.log('[HYPNOX][COMMANDS] Sincronización completada correctamente.');
-  }
+  if (failures.length) console.error(`[HYPNOX][COMMANDS] Sincronización incompleta: ${failures.join(', ')}.`);
+  else console.log('[HYPNOX][COMMANDS] Sincronización completada correctamente.');
 
   return { guilds: guilds.length, failures };
 }
@@ -135,10 +132,6 @@ function registerConnectionDiagnostics(client) {
   client.on(Events.ShardReconnecting, (shardId) => console.warn(`[HYPNOX][DISCORD] Shard ${shardId} intentando reconectar...`));
   client.on(Events.ShardReady, (shardId, unavailableGuilds) => console.log(`[HYPNOX][DISCORD] Shard ${shardId} lista. Guilds no disponibles: ${unavailableGuilds?.size ?? 0}.`));
   client.on(Events.Invalidated, () => console.error('[HYPNOX][DISCORD] La sesión fue invalidada. Será necesario volver a iniciar sesión.'));
-
-  if (client.ws?.on) {
-    client.ws.on('INTERACTION_CREATE', () => {});
-  }
 }
 
 async function verifyDiscordToken() {
@@ -159,9 +152,7 @@ async function checkDiscordGatewayHttp() {
       headers: { 'User-Agent': 'Hypnox-Bot/1.0' }
     });
     const body = await response.text();
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}: ${body.slice(0, 300)}`);
-    }
+    if (!response.ok) throw new Error(`HTTP ${response.status}: ${body.slice(0, 300)}`);
     console.log(`[HYPNOX][GATEWAY] HTTPS de Discord disponible (${Date.now() - startedAt} ms).`);
     return true;
   } catch (error) {
@@ -228,9 +219,7 @@ async function loginWithDiagnostics(client) {
   }
 
   const ready = await waitForClientReady(client, READY_WATCHDOG_MS);
-  if (!ready) {
-    console.warn(`[HYPNOX][GATEWAY] Sin READY después de ${(GATEWAY_WAIT_MS + READY_WATCHDOG_MS) / 1000}s. No se finalizará el proceso automáticamente.`);
-  }
+  if (!ready) console.warn(`[HYPNOX][GATEWAY] Sin READY después de ${(GATEWAY_WAIT_MS + READY_WATCHDOG_MS) / 1000}s. No se finalizará el proceso automáticamente.`);
   return ready;
 }
 
@@ -265,23 +254,14 @@ async function syncGuildsToSupabase(client) {
 async function handleClientReady(client) {
   console.log(`[HYPNOX][READY] CONECTADO COMO ${client.user.tag} (${client.user.id})`);
 
-  try {
-    await registerSlashCommands(client);
-  } catch (error) {
-    console.error('[HYPNOX][COMMANDS] ERROR:', error.message);
-  }
+  try { await registerSlashCommands(client); }
+  catch (error) { console.error('[HYPNOX][COMMANDS] ERROR:', error.message); }
 
-  try {
-    await syncGuildsToSupabase(client);
-  } catch (error) {
-    console.error('[HYPNOX][SUPABASE] Error sincronizando servidores:', error.message);
-  }
+  try { await syncGuildsToSupabase(client); }
+  catch (error) { console.error('[HYPNOX][SUPABASE] Error sincronizando servidores:', error.message); }
 
-  try {
-    await verifySupabaseConnection();
-  } catch (error) {
-    console.error('[HYPNOX][SUPABASE] ERROR:', error.message);
-  }
+  try { await verifySupabaseConnection(); }
+  catch (error) { console.error('[HYPNOX][SUPABASE] ERROR:', error.message); }
 
   if (!schedulerClients.has(client)) {
     schedulerClients.add(client);
@@ -295,11 +275,8 @@ function registerGracefulShutdown(client) {
     if (shuttingDown) return;
     shuttingDown = true;
     console.log(`[HYPNOX][PROCESS] Señal ${signal} recibida. Cerrando el cliente de Discord...`);
-    try {
-      client.destroy();
-    } finally {
-      process.exitCode = 0;
-    }
+    try { client.destroy(); }
+    finally { process.exitCode = 0; }
   };
 
   process.once('SIGINT', () => shutdown('SIGINT'));
