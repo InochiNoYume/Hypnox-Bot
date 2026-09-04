@@ -283,6 +283,27 @@ function registerGracefulShutdown(client) {
   process.once('SIGTERM', () => shutdown('SIGTERM'));
 }
 
+function patchGatewayBotRequest(client, gatewayInformation) {
+  if (!client?.rest || typeof client.rest.get !== 'function') {
+    throw new Error('No se pudo acceder al REST de discord.js para configurar el Gateway.');
+  }
+
+  const originalGet = client.rest.get.bind(client.rest);
+  let gatewayRequestCount = 0;
+
+  client.rest.get = async (route, options) => {
+    if (String(route) === '/gateway/bot') {
+      gatewayRequestCount += 1;
+      console.log(`[HYPNOX][GATEWAY] Gateway Bot local (${gatewayRequestCount}) — evitando /gateway/bot por HTTP.`);
+      return gatewayInformation;
+    }
+
+    return originalGet(route, options);
+  };
+
+  console.log('[HYPNOX][GATEWAY] Fallback /gateway/bot configurado sobre REST de discord.js.');
+}
+
 async function bootstrap() {
   validateEnv();
   console.log('[HYPNOX][ENV] Variables de entorno validadas.');
@@ -310,16 +331,7 @@ async function bootstrap() {
     }
   });
 
-  // discord.js Client reconstruye ws.fetchGatewayInformation() al crear el manager,
-  // sobrescribiendo el callback recibido en ClientOptions. Por eso el override debe
-  // hacerse sobre el manager ya construido y antes de client.login().
-  if (client.ws?.options) {
-    client.ws.options.shardCount = 1;
-    client.ws.options.fetchGatewayInformation = async () => gatewayInformation;
-    console.log('[HYPNOX][GATEWAY] Información del Gateway HTTP override configurada.');
-  } else {
-    throw new Error('No se pudo acceder al WebSocketManager de discord.js para configurar el Gateway.');
-  }
+  patchGatewayBotRequest(client, gatewayInformation);
 
   client.commands = new Collection();
   loadCommands(client);
