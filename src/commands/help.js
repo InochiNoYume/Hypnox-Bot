@@ -57,9 +57,7 @@ async function execute(interaction) {
   let commands = COMMANDS[sub] || [];
   if (sub === 'postulaciones' && type === 'official') commands = ['/abierto', '/cerrado', '/aceptado'];
   if (sub === 'postulaciones' && type === 'applications') commands = ['/requisitos', '/informacion', '/postular', '/resultado', '/estado-postulacion'];
-  if (sub === 'eventos') {
-    commands = type === 'official' ? COMMANDS.eventos : ['/evento crear', '/evento editar', '/evento cancelar', '/evento iniciar', '/evento finalizar'];
-  }
+  if (sub === 'eventos') commands = type === 'official' ? COMMANDS.eventos : ['/evento crear', '/evento editar', '/evento cancelar', '/evento iniciar', '/evento finalizar'];
   if (sub === 'anuncios' && type === 'staff') commands = ['/anuncio', '/anuncio-programado crear', '/anuncio-programado lista', '/anuncio-programado cancelar'];
   if (sub === 'administracion' && type === 'applications') commands = ['/administracion config', '/administracion set-channel', '/administracion set-role', '/administracion set-permission', '/administracion maintenance', '/administracion reload'];
   const embed = brandedEmbed(category.title, category.description);
