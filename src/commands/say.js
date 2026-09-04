@@ -1,10 +1,12 @@
-const { SlashCommandBuilder } = require('discord.js');
+const { SlashCommandBuilder, MessageFlags } = require('discord.js');
 
 const MANAGEMENT_ROLES = [
   'OFFICIAL_ROLE_FOUNDER_ID', 'OFFICIAL_ROLE_DIRECTOR_ID', 'OFFICIAL_ROLE_ADMINISTRATOR_ID',
   'STAFF_ROLE_FOUNDER_ID', 'STAFF_ROLE_DIRECTOR_ID', 'STAFF_ROLE_ADMINISTRATIVE_ASSISTANT_ID',
   'APPLICATIONS_ROLE_FOUNDER_ID', 'APPLICATIONS_ROLE_DIRECTOR_ID', 'APPLICATIONS_ROLE_ADMINISTRATOR_ID'
 ];
+
+const EPHEMERAL = MessageFlags.Ephemeral;
 
 const data = new SlashCommandBuilder()
   .setName('say')
@@ -16,7 +18,7 @@ const data = new SlashCommandBuilder()
 
 async function execute(interaction) {
   const message = interaction.options.getString('mensaje', true).trim();
-  if (!message) return interaction.reply({ content: 'Debes indicar un mensaje.', ephemeral: true });
+  if (!message) return interaction.reply({ content: 'Debes indicar un mensaje.', flags: EPHEMERAL });
 
   await interaction.channel.send({ content: message, allowedMentions: { parse: [] } });
 
@@ -26,7 +28,7 @@ async function execute(interaction) {
   }
 
   if (interaction.isChatInputCommand?.()) {
-    await interaction.reply({ content: 'Mensaje publicado.', ephemeral: true });
+    await interaction.reply({ content: 'Mensaje publicado.', flags: EPHEMERAL });
     setTimeout(() => interaction.deleteReply().catch(() => {}), 1200);
   }
 }
