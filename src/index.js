@@ -287,13 +287,28 @@ async function bootstrap() {
   validateEnv();
   console.log('[HYPNOX][ENV] Variables de entorno validadas.');
 
+  const gatewayInformation = {
+    url: 'wss://gateway.discord.gg',
+    shards: 1,
+    session_start_limit: {
+      total: 1000,
+      remaining: 1000,
+      reset_after: 0,
+      max_concurrency: 1
+    }
+  };
+
   const client = new Client({
     intents: [
       GatewayIntentBits.Guilds,
       GatewayIntentBits.GuildMembers,
       GatewayIntentBits.GuildMessages,
       GatewayIntentBits.MessageContent
-    ]
+    ],
+    ws: {
+      shardCount: 1,
+      fetchGatewayInformation: async () => gatewayInformation
+    }
   });
 
   client.commands = new Collection();
