@@ -1,6 +1,8 @@
-const { SlashCommandBuilder } = require('discord.js');
+const { SlashCommandBuilder, MessageFlags } = require('discord.js');
 const { getGuildType } = require('../utils/guild');
 const { isAdminOrHigher, getConfiguredChannel, accessDenied, missingChannel, base } = require('../utils/postulacionesPanels');
+
+const EPHEMERAL = MessageFlags.Ephemeral;
 
 const data = new SlashCommandBuilder()
   .setName('resultado')
@@ -11,10 +13,10 @@ const data = new SlashCommandBuilder()
     .setRequired(true));
 
 async function execute(interaction) {
-  if (getGuildType(interaction.guildId) !== 'applications') return interaction.reply({ content: 'Este comando solo está disponible en el Discord Staff Applications.', ephemeral: true });
-  if (!isAdminOrHigher(interaction.member)) return interaction.reply({ content: accessDenied(), ephemeral: true });
+  if (getGuildType(interaction.guildId) !== 'applications') return interaction.reply({ content: 'Este comando solo está disponible en el Discord Staff Applications.', flags: EPHEMERAL });
+  if (!isAdminOrHigher(interaction.member)) return interaction.reply({ content: accessDenied(), flags: EPHEMERAL });
   const { channel, envKey } = await getConfiguredChannel(interaction, 'resultado');
-  if (!channel) return interaction.reply({ content: missingChannel(envKey || 'APPLICATIONS_CHANNEL_RESULTS_ID'), ephemeral: true });
+  if (!channel) return interaction.reply({ content: missingChannel(envKey || 'APPLICATIONS_CHANNEL_RESULTS_ID'), flags: EPHEMERAL });
 
   const result = interaction.options.getString('resultado', true);
   const embed = base('RESULTADO DE POSTULACIONES', 'La revisión de la convocatoria ha finalizado. A continuación se comunica el resultado correspondiente.');
@@ -25,7 +27,7 @@ async function execute(interaction) {
   );
   embed.setFooter({ text: 'Hypnox Studios • Resultados de Staff' });
   await channel.send({ embeds: [embed] });
-  return interaction.reply({ content: `Resultado publicado en <#${channel.id}>.`, ephemeral: true });
+  return interaction.reply({ content: `Resultado publicado en <#${channel.id}>.`, flags: EPHEMERAL });
 }
 
 module.exports = { data, execute, guilds: ['applications'] };
