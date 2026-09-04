@@ -35,6 +35,3 @@ jobs:
         run: npm run validate
       - name: Deploy slash commands
         run: npm run deploy
-
-      - name: Workflow dispatch verification
-        run: echo "Discord command deployment workflow reached the deploy stage successfully."
