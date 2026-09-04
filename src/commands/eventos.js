@@ -1,9 +1,10 @@
-const { SlashCommandBuilder } = require('discord.js');
+const { SlashCommandBuilder, MessageFlags } = require('discord.js');
 const supabase = require('../database/supabase');
 const { writeLog } = require('../services/logs');
 const { getGuildRow } = require('../services/guilds');
 const { brandedEmbed } = require('../utils/embeds');
 
+const EPHEMERAL = MessageFlags.Ephemeral;
 const OFFICIAL_ROLES = [
   'OFFICIAL_ROLE_FOUNDER_ID', 'OFFICIAL_ROLE_DIRECTOR_ID', 'OFFICIAL_ROLE_ADMINISTRATOR_ID',
   'OFFICIAL_ROLE_SRMOD_ID', 'OFFICIAL_ROLE_MOD_ID', 'OFFICIAL_ROLE_TMOD_ID', 'OFFICIAL_ROLE_HELPER_ID'
@@ -36,7 +37,7 @@ const data = new SlashCommandBuilder()
 
 async function execute(interaction) {
   const guild = await getGuildRow(interaction.guild.id);
-  if (!guild) return interaction.reply({ content: 'Servidor no registrado.', ephemeral: true });
+  if (!guild) return interaction.reply({ content: 'Servidor no registrado.', flags: EPHEMERAL });
 
   try {
     const sub = interaction.options.getSubcommand();
@@ -44,9 +45,9 @@ async function execute(interaction) {
       const start = new Date(interaction.options.getString('inicio'));
       const endText = interaction.options.getString('fin');
       const end = endText ? new Date(endText) : null;
-      if (Number.isNaN(start.getTime()) || (end && Number.isNaN(end.getTime()))) return interaction.reply({ content: 'Fecha ISO inválida.', ephemeral: true });
-      if (end && end <= start) return interaction.reply({ content: 'La fecha de finalización debe ser posterior a la fecha de inicio.', ephemeral: true });
-      if (start <= new Date()) return interaction.reply({ content: 'La fecha de inicio debe ser futura.', ephemeral: true });
+      if (Number.isNaN(start.getTime()) || (end && Number.isNaN(end.getTime()))) return interaction.reply({ content: 'Fecha ISO inválida.', flags: EPHEMERAL });
+      if (end && end <= start) return interaction.reply({ content: 'La fecha de finalización debe ser posterior a la fecha de inicio.', flags: EPHEMERAL });
+      if (start <= new Date()) return interaction.reply({ content: 'La fecha de inicio debe ser futura.', flags: EPHEMERAL });
 
       const { data: event, error } = await supabase.from('events').insert({
         guild_id: guild.id, channel_id: interaction.channel.id,
@@ -69,34 +70,34 @@ async function execute(interaction) {
       const { error: messageError } = await supabase.from('events').update({ message_id: message.id }).eq('id', event.id);
       if (messageError) throw messageError;
       await writeLog({ guild: interaction.guild, category: 'event', action: 'create', actorId: interaction.user.id, channelId: interaction.channel.id, message: event.title, metadata: { eventId: event.id } });
-      return interaction.reply({ content: `Evento creado: \`${event.id}\``, ephemeral: true });
+      return interaction.reply({ content: `Evento creado: \`${event.id}\``, flags: EPHEMERAL });
     }
 
     const id = interaction.options.getString('id');
     const { data: current, error: currentError } = await supabase.from('events').select('*').eq('id', id).eq('guild_id', guild.id).maybeSingle();
     if (currentError) throw currentError;
-    if (!current) return interaction.reply({ content: 'No se encontró el evento indicado.', ephemeral: true });
-    if (['cancelar','iniciar','finalizar'].includes(sub) && current.status === 'finished') return interaction.reply({ content: 'Este evento ya está finalizado.', ephemeral: true });
-    if (sub === 'cancelar' && current.status === 'cancelled') return interaction.reply({ content: 'Este evento ya está cancelado.', ephemeral: true });
-    if (sub === 'iniciar' && current.status !== 'upcoming') return interaction.reply({ content: 'Solo puedes iniciar un evento programado.', ephemeral: true });
-    if (sub === 'finalizar' && current.status !== 'active') return interaction.reply({ content: 'Solo puedes finalizar un evento activo.', ephemeral: true });
+    if (!current) return interaction.reply({ content: 'No se encontró el evento indicado.', flags: EPHEMERAL });
+    if (['cancelar','iniciar','finalizar'].includes(sub) && current.status === 'finished') return interaction.reply({ content: 'Este evento ya está finalizado.', flags: EPHEMERAL });
+    if (sub === 'cancelar' && current.status === 'cancelled') return interaction.reply({ content: 'Este evento ya está cancelado.', flags: EPHEMERAL });
+    if (sub === 'iniciar' && current.status !== 'upcoming') return interaction.reply({ content: 'Solo puedes iniciar un evento programado.', flags: EPHEMERAL });
+    if (sub === 'finalizar' && current.status !== 'active') return interaction.reply({ content: 'Solo puedes finalizar un evento activo.', flags: EPHEMERAL });
 
     const patch = { updated_at: new Date().toISOString() };
     if (sub === 'editar') {
-      if (!['upcoming','active'].includes(current.status)) return interaction.reply({ content: 'Solo puedes editar un evento programado o activo.', ephemeral: true });
+      if (!['upcoming','active'].includes(current.status)) return interaction.reply({ content: 'Solo puedes editar un evento programado o activo.', flags: EPHEMERAL });
       const title = interaction.options.getString('titulo');
       const description = interaction.options.getString('descripcion');
       const startText = interaction.options.getString('inicio');
       const endText = interaction.options.getString('fin');
-      if (!title && !description && !startText && !endText) return interaction.reply({ content: 'Debes indicar al menos un campo para actualizar.', ephemeral: true });
+      if (!title && !description && !startText && !endText) return interaction.reply({ content: 'Debes indicar al menos un campo para actualizar.', flags: EPHEMERAL });
       if (title) patch.title = title.trim();
       if (description) patch.description = description.trim();
       const start = startText ? new Date(startText) : new Date(current.starts_at);
       const end = endText ? new Date(endText) : (current.ends_at ? new Date(current.ends_at) : null);
-      if (startText && Number.isNaN(start.getTime())) return interaction.reply({ content: 'Fecha de inicio ISO inválida.', ephemeral: true });
-      if (endText && Number.isNaN(end.getTime())) return interaction.reply({ content: 'Fecha de finalización ISO inválida.', ephemeral: true });
-      if (startText && start <= new Date()) return interaction.reply({ content: 'La fecha de inicio debe ser futura.', ephemeral: true });
-      if (end && end <= start) return interaction.reply({ content: 'La fecha de finalización debe ser posterior a la fecha de inicio.', ephemeral: true });
+      if (startText && Number.isNaN(start.getTime())) return interaction.reply({ content: 'Fecha de inicio ISO inválida.', flags: EPHEMERAL });
+      if (endText && Number.isNaN(end.getTime())) return interaction.reply({ content: 'Fecha de finalización ISO inválida.', flags: EPHEMERAL });
+      if (startText && start <= new Date()) return interaction.reply({ content: 'La fecha de inicio debe ser futura.', flags: EPHEMERAL });
+      if (end && end <= start) return interaction.reply({ content: 'La fecha de finalización debe ser posterior a la fecha de inicio.', flags: EPHEMERAL });
       if (startText) patch.starts_at = start.toISOString();
       if (endText) patch.ends_at = end?.toISOString() || null;
     } else {
@@ -106,10 +107,10 @@ async function execute(interaction) {
     const { data: updated, error } = await supabase.from('events').update(patch).eq('id', id).eq('guild_id', guild.id).select().single();
     if (error) throw error;
     await writeLog({ guild: interaction.guild, category: 'event', action: sub, actorId: interaction.user.id, channelId: interaction.channel.id, message: id, metadata: { previousStatus: current.status, newStatus: updated.status } });
-    return interaction.reply({ content: `Evento actualizado: ${updated.title}.`, ephemeral: true });
+    return interaction.reply({ content: `Evento actualizado: ${updated.title}.`, flags: EPHEMERAL });
   } catch (error) {
     console.error('[HYPNOX] Event error:', error);
-    return interaction.reply({ content: 'No se pudo gestionar el evento.', ephemeral: true }).catch(() => {});
+    return interaction.reply({ content: 'No se pudo gestionar el evento.', flags: EPHEMERAL }).catch(() => {});
   }
 }
 
