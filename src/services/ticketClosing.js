@@ -1,6 +1,6 @@
 const { ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder, ButtonBuilder, ButtonStyle, AttachmentBuilder, MessageFlags } = require('discord.js');
 const { getGuildType } = require('../utils/guild');
-const { getTicket, updateTicket, addTicketEvent } = require('./tickets');
+const { getTicket, updateTicket, addTicketEvent, getTicketCreatorDiscordId } = require('./tickets');
 const { getEnv } = require('../config/env');
 const { writeLog } = require('./logs');
 const { hasConfiguredRole } = require('../utils/permissions');
@@ -34,8 +34,13 @@ function buildCloseConfirmation() {
   );
 }
 
-function buildCloseConfirmationEmbed() {
-  const embed = brandedEmbed('CONFIRMACIÓN DE CIERRE', '¿Deseas cerrar este ticket? Si confirmas, se solicitará el motivo del cierre antes de finalizar la atención.');
+function buildCloseConfirmationEmbed(ticket, interaction, creatorId) {
+  const embed = brandedEmbed('CONFIRMACIÓN DE CIERRE', 'Se ha solicitado el cierre de este ticket. Revisa la información antes de continuar.');
+  embed.addFields(
+    { name: '◆ SOLICITANTE', value: creatorId ? `<@${creatorId}>` : 'No disponible', inline: true },
+    { name: '◆ STAFF', value: `<@${interaction.user.id}>`, inline: true },
+    { name: '◆ ACCIÓN', value: 'Si confirmas, se solicitará el motivo del cierre y posteriormente se generará el transcript.', inline: false }
+  );
   embed.setFooter({ text: 'Hypnox Studios • Sistema de atención' });
   return embed;
 }
@@ -68,7 +73,8 @@ async function showCloseModal(interaction) {
   if (!canCloseTicket(interaction, ticket)) {
     return interaction.reply({ content: 'No tienes permiso para cerrar este tipo de ticket.', flags: EPHEMERAL });
   }
-  return interaction.reply({ embeds: [buildCloseConfirmationEmbed()], components: [buildCloseConfirmation()], flags: EPHEMERAL });
+  const creatorId = await getTicketCreatorDiscordId(ticket).catch(() => null);
+  return interaction.reply({ embeds: [buildCloseConfirmationEmbed(ticket, interaction, creatorId)], components: [buildCloseConfirmation()], flags: EPHEMERAL });
 }
 
 async function confirmClose(interaction) {
@@ -161,8 +167,13 @@ async function closeTicketWithReason(interaction, reason) {
     await addTicketEvent(ticket.id, interaction.user.id, 'closed', cleanReason, { assigned_to_discord_user_id: ticket.assigned_to_discord_user_id || null, reason: cleanReason });
     await writeLog({ guild: interaction.guild, category: 'ticket', action: 'close', actorId: interaction.user.id, channelId: channel.id, message: `Ticket ${ticket.id} cerrado. Motivo: ${cleanReason}`, metadata: { ticketId: ticket.id, reason: cleanReason, assignedTo: ticket.assigned_to_discord_user_id || null } });
 
+    const creatorId = await getTicketCreatorDiscordId(ticket).catch(() => null);
     const embed = brandedEmbed('TICKET CERRADO', 'La atención de esta solicitud ha finalizado. El canal será eliminado en unos segundos.');
-    embed.addFields({ name: '◆ CERRADO POR', value: `<@${interaction.user.id}>`, inline: true }, { name: '◆ MOTIVO', value: cleanReason, inline: false });
+    embed.addFields(
+      { name: '◆ SOLICITANTE', value: creatorId ? `<@${creatorId}>` : 'No disponible', inline: true },
+      { name: '◆ CERRADO POR', value: `<@${interaction.user.id}>`, inline: true },
+      { name: '◆ MOTIVO', value: cleanReason, inline: false }
+    );
     embed.setFooter({ text: 'Hypnox Studios • Sistema de atención' });
     await channel.send({ embeds: [embed] }).catch(() => {});
     await interaction.editReply({ content: 'Ticket cerrado. El transcript fue procesado y el canal será eliminado en unos segundos.' });
