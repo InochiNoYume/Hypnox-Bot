@@ -128,7 +128,7 @@ async function execute(interaction) {
 
     await writeLog({
       guild: interaction.guild,
-      category: 'activity',
+      category: 'event',
       action: `comienza_${type}`,
       actorId: interaction.user.id,
       channelId: channel.id,
