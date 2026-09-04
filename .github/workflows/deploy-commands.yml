@@ -1,0 +1,41 @@
+name: Deploy Discord Commands
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'src/commands/**'
+      - 'src/deploy-commands.js'
+      - 'src/handlers/loadCommands.js'
+      - 'src/utils/validateCommands.js'
+      - '.github/workflows/deploy-commands.yml'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      DISCORD_TOKEN: ${{ secrets.DISCORD_TOKEN }}
+      DISCORD_CLIENT_ID: '1544513944658387005'
+      OFFICIAL_GUILD_ID: '1497016616284721164'
+      STAFF_GUILD_ID: '1543522296432697445'
+      APPLICATIONS_GUILD_ID: '1544347040199221298'
+      DISCORD_DEV_GUILD_ID: '1544513315546337290'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.x
+          cache: npm
+
+      - name: Install dependencies
+        run: npm install --ignore-scripts
+
+      - name: Verify command definitions
+        run: npm run validate
+
+      - name: Deploy slash commands
+        run: npm run deploy
