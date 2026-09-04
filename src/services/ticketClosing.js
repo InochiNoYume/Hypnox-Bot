@@ -34,7 +34,7 @@ function buildCloseConfirmation() {
   );
 }
 
-function buildCloseConfirmationEmbed(ticket, interaction, creatorId) {
+function buildCloseConfirmationEmbed(interaction, creatorId) {
   const embed = brandedEmbed('CONFIRMACIÓN DE CIERRE', 'Se ha solicitado el cierre de este ticket. Revisa la información antes de continuar.');
   embed.addFields(
     { name: '◆ SOLICITANTE', value: creatorId ? `<@${creatorId}>` : 'No disponible', inline: true },
@@ -74,7 +74,7 @@ async function showCloseModal(interaction) {
     return interaction.reply({ content: 'No tienes permiso para cerrar este tipo de ticket.', flags: EPHEMERAL });
   }
   const creatorId = await getTicketCreatorDiscordId(ticket).catch(() => null);
-  return interaction.reply({ embeds: [buildCloseConfirmationEmbed(ticket, interaction, creatorId)], components: [buildCloseConfirmation()], flags: EPHEMERAL });
+  return interaction.reply({ embeds: [buildCloseConfirmationEmbed(interaction, creatorId)], components: [buildCloseConfirmation()], flags: EPHEMERAL });
 }
 
 async function confirmClose(interaction) {
@@ -96,6 +96,7 @@ async function keepTicketOpen(interaction) {
 async function buildTranscript(channel, ticket, closedBy = null, reason = null) {
   const messages = [];
   let before;
+
   while (true) {
     const batch = await channel.messages.fetch({ limit: 100, ...(before ? { before } : {}) });
     if (!batch.size) break;
@@ -103,7 +104,9 @@ async function buildTranscript(channel, ticket, closedBy = null, reason = null) 
     before = batch.last().id;
     if (batch.size < 100) break;
   }
+
   messages.reverse();
+
   const lines = [
     'HYPNOX STUDIOS — TRANSCRIPT DE TICKET',
     `Canal: #${channel.name}`,
@@ -117,42 +120,73 @@ async function buildTranscript(channel, ticket, closedBy = null, reason = null) 
     '------------------------------------------------------------',
     ''
   ];
+
   for (const message of messages) {
     const timestamp = new Date(message.createdTimestamp).toISOString();
     const author = `${message.author?.tag || message.author?.username || 'Usuario'} (${message.author?.id || 'N/D'})`;
     const content = message.content?.trim() || '[Sin contenido de texto]';
     lines.push(`[${timestamp}] ${author}: ${content}`);
+
     if (message.attachments?.size) {
-      for (const attachment of message.attachments.values()) lines.push(`  Adjunto: ${attachment.url}`);
+      for (const attachment of message.attachments.values()) {
+        lines.push(`  Adjunto: ${attachment.url}`);
+      }
     }
   }
+
   return Buffer.from(lines.join('\n'), 'utf8');
 }
 
 async function sendTranscript(channel, interaction, ticket, reason = null) {
+  const logsChannelId = getEnv('OFFICIAL_LOGS_CHANNEL_ID');
+  if (!logsChannelId) return { sent: false, reason: 'OFFICIAL_LOGS_CHANNEL_ID no está configurado.' };
+
+  const logsChannel = await interaction.guild.channels.fetch(logsChannelId).catch(() => null);
+  if (!logsChannel?.isTextBased()) return { sent: false, reason: 'El canal de logs no está disponible o no es un canal de texto.' };
+
   const buffer = await buildTranscript(channel, ticket, interaction.user, reason);
   const attachment = new AttachmentBuilder(buffer, { name: `transcript-${channel.id}.txt` });
-  const logsChannelId = getEnv('OFFICIAL_LOGS_CHANNEL_ID');
-  const logsChannel = logsChannelId ? await interaction.guild.channels.fetch(logsChannelId).catch(() => null) : null;
-  if (logsChannel?.isTextBased()) {
-    await logsChannel.send({ content: `Transcript del ticket <#${channel.id}> generado por <@${interaction.user.id}>.`, files: [attachment] });
-    return true;
+
+  try {
+    await logsChannel.send({
+      content: `Transcript del ticket <#${channel.id}> generado por <@${interaction.user.id}>.`,
+      files: [attachment]
+    });
+    return { sent: true, reason: null };
+  } catch (error) {
+    return { sent: false, reason: error?.message || 'No se pudo enviar el transcript al canal de logs.' };
   }
-  return false;
 }
 
 async function generateTranscript(interaction) {
-  if (getGuildType(interaction.guildId) !== 'official') return interaction.reply({ content: 'El sistema de tickets solo está disponible en el servidor oficial.', flags: EPHEMERAL });
+  if (getGuildType(interaction.guildId) !== 'official') {
+    return interaction.reply({ content: 'El sistema de tickets solo está disponible en el servidor oficial.', flags: EPHEMERAL });
+  }
+
   const ticket = await getTicket(interaction.channelId).catch(() => null);
   if (!ticket) return interaction.reply({ content: 'Este canal no corresponde a un ticket abierto.', flags: EPHEMERAL });
-  if (!canCloseTicket(interaction, ticket)) return interaction.reply({ content: 'Solo el personal autorizado para este ticket puede generar el transcript.', flags: EPHEMERAL });
+  if (!canCloseTicket(interaction, ticket)) {
+    return interaction.reply({ content: 'Solo el personal autorizado para este ticket puede generar el transcript.', flags: EPHEMERAL });
+  }
+
   await interaction.deferReply({ flags: EPHEMERAL });
-  const sent = await sendTranscript(interaction.channel, interaction, ticket);
-  return interaction.editReply({ content: sent ? 'Transcript generado y enviado al canal de logs.' : 'No se pudo encontrar el canal de logs configurado.' });
+
+  try {
+    const result = await sendTranscript(interaction.channel, interaction, ticket);
+    if (!result.sent) {
+      console.error(`[HYPNOX] Ticket transcript error ${ticket.id}: ${result.reason}`);
+      return interaction.editReply({ content: `No se pudo generar el transcript: ${result.reason}` });
+    }
+    return interaction.editReply({ content: 'Transcript generado y enviado al canal de logs.' });
+  } catch (error) {
+    console.error('[HYPNOX] Ticket transcript error:', error);
+    return interaction.editReply({ content: 'No se pudo generar el transcript. El error fue registrado para revisión.' });
+  }
 }
 
 async function closeTicketWithReason(interaction, reason) {
   await interaction.deferReply({ flags: EPHEMERAL });
+
   try {
     const ticket = await getTicket(interaction.channelId);
     if (!ticket) return interaction.editReply({ content: 'Este ticket ya está cerrado o no existe.' });
@@ -162,10 +196,36 @@ async function closeTicketWithReason(interaction, reason) {
     if (cleanReason.length < 5) return interaction.editReply({ content: 'El motivo de cierre debe tener al menos 5 caracteres.' });
 
     const channel = interaction.channel;
-    await sendTranscript(channel, interaction, ticket, cleanReason).catch((error) => console.error('[HYPNOX] Ticket transcript error:', error));
-    await updateTicket(ticket.id, { status: 'closed', closed_by_discord_user_id: interaction.user.id, closed_at: new Date().toISOString() });
-    await addTicketEvent(ticket.id, interaction.user.id, 'closed', cleanReason, { assigned_to_discord_user_id: ticket.assigned_to_discord_user_id || null, reason: cleanReason });
-    await writeLog({ guild: interaction.guild, category: 'ticket', action: 'close', actorId: interaction.user.id, channelId: channel.id, message: `Ticket ${ticket.id} cerrado. Motivo: ${cleanReason}`, metadata: { ticketId: ticket.id, reason: cleanReason, assignedTo: ticket.assigned_to_discord_user_id || null } });
+    const transcript = await sendTranscript(channel, interaction, ticket, cleanReason);
+    if (!transcript.sent) {
+      console.error(`[HYPNOX] Ticket ${ticket.id} no cerrado porque falló el transcript: ${transcript.reason}`);
+      return interaction.editReply({ content: `No se cerró el ticket porque no se pudo guardar el transcript: ${transcript.reason}` });
+    }
+
+    await updateTicket(ticket.id, {
+      status: 'closed',
+      closed_by_discord_user_id: interaction.user.id,
+      closed_at: new Date().toISOString()
+    });
+
+    await addTicketEvent(ticket.id, interaction.user.id, 'closed', cleanReason, {
+      assigned_to_discord_user_id: ticket.assigned_to_discord_user_id || null,
+      reason: cleanReason
+    });
+
+    await writeLog({
+      guild: interaction.guild,
+      category: 'ticket',
+      action: 'close',
+      actorId: interaction.user.id,
+      channelId: channel.id,
+      message: `Ticket ${ticket.id} cerrado. Motivo: ${cleanReason}`,
+      metadata: {
+        ticketId: ticket.id,
+        reason: cleanReason,
+        assignedTo: ticket.assigned_to_discord_user_id || null
+      }
+    });
 
     const creatorId = await getTicketCreatorDiscordId(ticket).catch(() => null);
     const embed = brandedEmbed('TICKET CERRADO', 'La atención de esta solicitud ha finalizado. El canal será eliminado en unos segundos.');
@@ -175,12 +235,24 @@ async function closeTicketWithReason(interaction, reason) {
       { name: '◆ MOTIVO', value: cleanReason, inline: false }
     );
     embed.setFooter({ text: 'Hypnox Studios • Sistema de atención' });
+
     await channel.send({ embeds: [embed] }).catch(() => {});
-    await interaction.editReply({ content: 'Ticket cerrado. El transcript fue procesado y el canal será eliminado en unos segundos.' });
+    await interaction.editReply({ content: 'Ticket cerrado. El transcript fue guardado y el canal será eliminado en unos segundos.' });
 
     setTimeout(async () => {
-      try { await channel.delete('Ticket cerrado'); }
-      catch (error) { console.error(`[HYPNOX] No se pudo eliminar el canal del ticket ${channel.id}:`, error); await writeLog({ guild: interaction.guild, category: 'ticket', action: 'delete_failed', actorId: interaction.user.id, channelId: channel.id, message: error?.message || 'Error desconocido' }).catch(() => {}); }
+      try {
+        await channel.delete('Ticket cerrado');
+      } catch (error) {
+        console.error(`[HYPNOX] No se pudo eliminar el canal del ticket ${channel.id}:`, error);
+        await writeLog({
+          guild: interaction.guild,
+          category: 'ticket',
+          action: 'delete_failed',
+          actorId: interaction.user.id,
+          channelId: channel.id,
+          message: error?.message || 'Error desconocido'
+        }).catch(() => {});
+      }
     }, 2000);
   } catch (error) {
     console.error('[HYPNOX] Ticket close error:', error);
@@ -188,4 +260,12 @@ async function closeTicketWithReason(interaction, reason) {
   }
 }
 
-module.exports = { canCloseTicket, buildCloseModal, showCloseModal, confirmClose, keepTicketOpen, generateTranscript, closeTicketWithReason };
+module.exports = {
+  canCloseTicket,
+  buildCloseModal,
+  showCloseModal,
+  confirmClose,
+  keepTicketOpen,
+  generateTranscript,
+  closeTicketWithReason
+};
