@@ -68,24 +68,33 @@ async function showCloseModal(interaction) {
   if (!isConfiguredStaff(interaction)) {
     return interaction.reply({ content: 'Solo el personal autorizado mediante los roles configurados puede cerrar tickets.', flags: EPHEMERAL });
   }
-  const ticket = await getTicket(interaction.channelId).catch(() => null);
-  if (!ticket) return interaction.reply({ content: 'Este canal no corresponde a un ticket abierto.', flags: EPHEMERAL });
-  if (!canCloseTicket(interaction, ticket)) {
-    return interaction.reply({ content: 'No tienes permiso para cerrar este tipo de ticket.', flags: EPHEMERAL });
+
+  await interaction.deferReply({ flags: EPHEMERAL });
+
+  try {
+    const ticket = await getTicket(interaction.channelId).catch(() => null);
+    if (!ticket) return interaction.editReply({ content: 'Este canal no corresponde a un ticket abierto.' });
+    if (!canCloseTicket(interaction, ticket)) {
+      return interaction.editReply({ content: 'No tienes permiso para cerrar este tipo de ticket.' });
+    }
+    const creatorId = await getTicketCreatorDiscordId(ticket).catch(() => null);
+    return interaction.editReply({ embeds: [buildCloseConfirmationEmbed(interaction, creatorId)], components: [buildCloseConfirmation()] });
+  } catch (error) {
+    console.error('[HYPNOX] Ticket close confirmation error:', error);
+    return interaction.editReply({ content: 'No se pudo preparar el cierre del ticket. El error fue registrado para revisión.' }).catch(() => {});
   }
-  const creatorId = await getTicketCreatorDiscordId(ticket).catch(() => null);
-  return interaction.reply({ embeds: [buildCloseConfirmationEmbed(interaction, creatorId)], components: [buildCloseConfirmation()], flags: EPHEMERAL });
 }
 
 async function confirmClose(interaction) {
   if (getGuildType(interaction.guildId) !== 'official') {
     return interaction.reply({ content: 'El sistema de tickets solo está disponible en el servidor oficial.', flags: EPHEMERAL });
   }
-  const ticket = await getTicket(interaction.channelId).catch(() => null);
-  if (!ticket) return interaction.update({ content: 'Este ticket ya está cerrado o no existe.', embeds: [], components: [] });
-  if (!canCloseTicket(interaction, ticket)) {
-    return interaction.reply({ content: 'No tienes permiso para cerrar este tipo de ticket.', flags: EPHEMERAL });
+  if (!isConfiguredStaff(interaction)) {
+    return interaction.reply({ content: 'Solo el personal autorizado mediante los roles configurados puede cerrar tickets.', flags: EPHEMERAL });
   }
+
+  // No hacemos consultas a Supabase antes de abrir el modal: Discord exige reconocer la interacción rápidamente.
+  // La existencia del ticket y el permiso específico por tipo se validan de nuevo al enviar el motivo.
   return interaction.showModal(buildCloseModal());
 }
 
