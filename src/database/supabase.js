@@ -1,16 +1,23 @@
 const { createClient } = require('@supabase/supabase-js');
+const { getEnv, getSupabaseKey } = require('../config/env');
 
-const url = process.env.SUPABASE_URL;
-const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const url = getEnv('SUPABASE_URL');
+const serverKey = getSupabaseKey();
 
-if (!url || !serviceRoleKey) {
-  throw new Error('SUPABASE_URL y SUPABASE_SERVICE_ROLE_KEY son obligatorios.');
+if (!url || !serverKey) {
+  throw new Error('Supabase no está configurado. Revisa SUPABASE_URL y SUPABASE_SECRET_KEY (o SUPABASE_SERVICE_ROLE_KEY).');
 }
 
-const supabase = createClient(url, serviceRoleKey, {
+const supabase = createClient(url, serverKey, {
   auth: {
     autoRefreshToken: false,
-    persistSession: false
+    persistSession: false,
+    detectSessionInUrl: false
+  },
+  global: {
+    headers: {
+      'X-Client-Info': 'hypnox-bot/1.0'
+    }
   }
 });
 
