@@ -24,18 +24,14 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 22.x
           cache: npm
-
       - name: Install dependencies
         run: npm install --ignore-scripts
-
       - name: Verify command definitions
         run: npm run validate
-
       - name: Deploy slash commands
         run: npm run deploy
