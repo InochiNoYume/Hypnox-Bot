@@ -72,13 +72,37 @@ La categoría **Bugs / Errores** registra específicamente los fallos técnicos 
 
 Los valores de interfaz se normalizan antes de guardarse en Supabase. La base de datos acepta actualmente `support`, `report`, `alliance_partner`, `contact` y `bugs`.
 
+## Eventos y participación
+
+El sistema de eventos permite crear, editar, cancelar, iniciar y finalizar actividades mediante `/evento`.
+
+La participación de miembros se registra por evento en Supabase:
+
+- `/evento-participar unirse <id>` registra al miembro en un evento programado o activo.
+- `/evento-participar salir <id>` retira su participación.
+- `/evento-participantes <id>` permite al equipo consultar la lista registrada.
+- La base de datos evita registros duplicados por evento y usuario.
+- `/comienza tipo:Evento` continúa utilizando el rol configurado de participantes para los avisos generales de inicio.
+
+Las participaciones utilizan el ID de Discord como referencia operativa y los datos internos permanecen protegidos mediante RLS y acceso `service_role`.
+
+## Monitorización y administración
+
+- `/status` muestra el estado interno de Discord, Gateway, Supabase, guilds reconocidas, uptime y versión de Node. Está limitado a Administradores.
+- `/auditoria usuario` consulta el historial interno registrado de un miembro para Staff autorizado.
+- `/reportes` gestiona reportes internos de usuarios.
+- `/encuesta` permite crear y cerrar encuestas con interacción mediante botones.
+- `/anuncio-programado` permite programar comunicaciones futuras; un worker interno revisa y publica las pendientes.
+
 ## Módulos
 
 - **Información:** help, reglas, links e información general.
 - **Moderación:** warn, warnings, unwarn, timeout, clear, slowmode, kick y ban.
 - **Tickets:** panel, formularios, creación, claim, cierre, adición y retirada de usuarios.
 - **Anuncios:** publicaciones oficiales con embed negro e imagen configurable.
-- **Eventos:** crear, editar, cancelar, iniciar y finalizar.
+- **Anuncios programados:** programación y publicación automática de comunicaciones.
+- **Eventos:** creación, edición, ciclo de vida y participación de miembros.
+- **Series:** comunicación y comienzo mediante el sistema de actividades configurado.
 - **Premios:** sorteos, participación, finalización, reroll y registro de entrega.
 - **Proyectos:** creación, edición, estado, cierre y asignación de manager.
 - **Postulaciones:** apertura, cierre, resultados, requisitos, FAQ y documentación del proceso.
@@ -118,6 +142,15 @@ OFFICIAL_ROLE_PRODUCER_ID=
 
 `OFFICIAL_TICKET_STAFF_MENTION_ROLE_ID` es opcional y se utiliza únicamente para mencionar el rol configurado al crear un ticket.
 
+Para `/comienza` también se configuran:
+
+```env
+OFFICIAL_ROLE_SERIES_PARTICIPANT_ID=
+OFFICIAL_ROLE_EVENT_PARTICIPANT_ID=
+OFFICIAL_CHANNEL_SERIES_ID=
+OFFICIAL_CHANNEL_EVENTS_ID=
+```
+
 ### Staff Team Discord
 
 El autorole de incorporación utiliza:
@@ -149,6 +182,13 @@ Las migraciones se encuentran en `database/migrations/`.
 - `20260902040000_harden_logs_and_rls_auto_enable.sql`: corrige categorías de logs, refuerza RLS en proyectos y tareas y restringe la ejecución pública de `rls_auto_enable()`.
 - `20260902050000_add_bugs_ticket_type.sql`: añade `bugs` como tipo válido de ticket.
 - `20260903031735_remove_dashboard_access.sql`: limpia restos de una capa de autorización web que ya no forma parte del proyecto.
+- `20260903115841_add_missing_foreign_key_indexes.sql`: añade índices para claves foráneas relevantes.
+- `20260903120100_protect_ticket_assignment_race.sql`: protege la asignación concurrente de tickets.
+- `20260903120927_harden_ticket_assignment_function_search_path.sql`: endurece la función de asignación de tickets.
+- `20260903141941_enforce_one_open_ticket_per_user.sql`: limita a un ticket abierto por usuario.
+- `20260903235113_revoke_public_trigger_function_execute.sql`: revoca ejecución pública de la función interna correspondiente.
+- `20260904010334_reports_polls_scheduled_announcements.sql`: añade reportes, encuestas y anuncios programados.
+- `20260904010829_add_event_participants.sql`: añade el registro de participantes por evento.
 
 Las migraciones históricas ya aplicadas no deben ejecutarse nuevamente de forma ciega sobre una base existente. Primero debe comprobarse el estado real de la base de datos.
 
