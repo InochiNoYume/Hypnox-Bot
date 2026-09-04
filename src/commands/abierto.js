@@ -1,7 +1,9 @@
-const { SlashCommandBuilder } = require('discord.js');
+const { SlashCommandBuilder, MessageFlags } = require('discord.js');
 const { getEnv } = require('../config/env');
 const { writeLog } = require('../services/logs');
 const { brandedEmbed } = require('../utils/embeds');
+
+const EPHEMERAL = MessageFlags.Ephemeral;
 
 const data = new SlashCommandBuilder()
   .setName('abierto')
@@ -14,7 +16,7 @@ const data = new SlashCommandBuilder()
 async function execute(interaction) {
   const channelId = getEnv('OFFICIAL_CHANNEL_APPLICATIONS_ID');
   const channel = channelId ? await interaction.guild.channels.fetch(channelId).catch(() => null) : null;
-  if (!channel?.isTextBased()) return interaction.reply({ content: 'Configura OFFICIAL_CHANNEL_APPLICATIONS_ID antes de abrir la postulación.', ephemeral: true });
+  if (!channel?.isTextBased()) return interaction.reply({ content: 'Configura OFFICIAL_CHANNEL_APPLICATIONS_ID antes de abrir la postulación.', flags: EPHEMERAL });
 
   const link = interaction.options.getString('link').trim();
   const image = getEnv('OFFICIAL_IMAGE_ANNOUNCEMENT') || getEnv('OFFICIAL_IMAGE_BANNER');
@@ -24,7 +26,7 @@ async function execute(interaction) {
 
   await channel.send({ embeds: [embed] });
   await writeLog({ guild: interaction.guild, category: 'application', action: 'opened', actorId: interaction.user.id, channelId: channel.id, message: link });
-  return interaction.reply({ content: `Postulación abierta en <#${channel.id}>.`, ephemeral: true });
+  return interaction.reply({ content: `Postulación abierta en <#${channel.id}>.`, flags: EPHEMERAL });
 }
 
 module.exports = { data, execute, guilds: ['official'], access: { roleEnvs: ['OFFICIAL_ROLE_FOUNDER_ID', 'OFFICIAL_ROLE_DIRECTOR_ID', 'OFFICIAL_ROLE_ADMINISTRATOR_ID'] } };
