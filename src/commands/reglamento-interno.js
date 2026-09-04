@@ -1,17 +1,19 @@
-const { SlashCommandBuilder } = require('discord.js');
+const { SlashCommandBuilder, MessageFlags } = require('discord.js');
 const { getGuildType } = require('../utils/guild');
 const { isAdminOrHigher, getConfiguredChannel, accessDenied, missingChannel, base } = require('../utils/postulacionesPanels');
+
+const EPHEMERAL = MessageFlags.Ephemeral;
 
 const data = new SlashCommandBuilder()
   .setName('reglamento-interno')
   .setDescription('Publica el Reglamento Interno en el servidor Staff.');
 
 async function execute(interaction) {
-  if (getGuildType(interaction.guildId) !== 'staff') return interaction.reply({ content: 'Este comando solo está disponible en el Discord Staff Team.', ephemeral: true });
-  if (!isAdminOrHigher(interaction.member)) return interaction.reply({ content: accessDenied(), ephemeral: true });
+  if (getGuildType(interaction.guildId) !== 'staff') return interaction.reply({ content: 'Este comando solo está disponible en el Discord Staff Team.', flags: EPHEMERAL });
+  if (!isAdminOrHigher(interaction.member)) return interaction.reply({ content: accessDenied(), flags: EPHEMERAL });
 
   const { channel, envKey } = await getConfiguredChannel(interaction, 'reglamento');
-  if (!channel) return interaction.reply({ content: missingChannel(envKey || 'STAFF_CHANNEL_INTERNAL_RULES_ID'), ephemeral: true });
+  if (!channel) return interaction.reply({ content: missingChannel(envKey || 'STAFF_CHANNEL_INTERNAL_RULES_ID'), flags: EPHEMERAL });
 
   const embed = base('REGLAMENTO INTERNO', 'Normativa interna de Hypnox Studios para el funcionamiento del equipo Staff.');
   embed.addFields(
@@ -26,7 +28,7 @@ async function execute(interaction) {
   embed.setFooter({ text: 'Hypnox Studios • Reglamento Interno Staff' });
 
   await channel.send({ embeds: [embed] });
-  return interaction.reply({ content: `Reglamento Interno publicado en <#${channel.id}>.`, ephemeral: true });
+  return interaction.reply({ content: `Reglamento Interno publicado en <#${channel.id}>.`, flags: EPHEMERAL });
 }
 
 module.exports = { data, execute, guilds: ['staff'] };
