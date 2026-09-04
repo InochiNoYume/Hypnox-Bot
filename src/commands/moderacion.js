@@ -1,4 +1,4 @@
-const { SlashCommandBuilder } = require('discord.js');
+const { SlashCommandBuilder, MessageFlags } = require('discord.js');
 const { brandedEmbed } = require('../utils/embeds');
 const { getGuildType } = require('../utils/guild');
 const { hasAnyRole } = require('../utils/permissions');
@@ -6,6 +6,7 @@ const { canModerate, canBotModerate } = require('../utils/moderation');
 const { createWarning, getWarnings, deactivateWarning, createModerationAction } = require('../services/moderation');
 const { writeLog } = require('../services/logs');
 
+const EPHEMERAL = MessageFlags.Ephemeral;
 const roleMap = {
   helper: ['HELPER'],
   tmod: ['TMOD', 'MOD', 'SRMOD', 'ADMINISTRATOR', 'DIRECTOR', 'FOUNDER'],
@@ -50,7 +51,7 @@ const command = new SlashCommandBuilder()
 async function execute(i) {
   const sub = i.options.getSubcommand();
   const level = { warn: 'helper', warnings: 'helper', unwarn: 'tmod', timeout: 'tmod', clear: 'tmod', slowmode: 'tmod', kick: 'mod', ban: 'srmod' }[sub];
-  if (!allowed(i.member, level)) return i.reply({ content: 'No tienes permisos para utilizar esta función.', ephemeral: true });
+  if (!allowed(i.member, level)) return i.reply({ content: 'No tienes permisos para utilizar esta función.', flags: EPHEMERAL });
 
   try {
     if (sub === 'warnings') {
@@ -63,40 +64,40 @@ async function execute(i) {
         { name: '◆ ACTIVAS', value: `**${active.length}**`, inline: true },
         { name: '◆ DETALLE', value: active.slice(0, 10).map((row) => `\`${row.id}\` — ${row.reason}`).join('\n') || 'No registra advertencias activas.', inline: false }
       );
-      return i.reply({ embeds: [embed], ephemeral: true });
+      return i.reply({ embeds: [embed], flags: EPHEMERAL });
     }
 
     if (sub === 'unwarn') {
       await deactivateWarning({ guildId: i.guild.id, warningId: i.options.getString('id') });
       await writeLog({ guild: i.guild, category: 'moderation', action: 'unwarn', actorId: i.user.id, message: i.options.getString('id') });
-      return i.reply({ content: 'La advertencia fue desactivada correctamente.', ephemeral: true });
+      return i.reply({ content: 'La advertencia fue desactivada correctamente.', flags: EPHEMERAL });
     }
 
     if (sub === 'clear') {
       const deleted = await i.channel.bulkDelete(i.options.getInteger('cantidad'), true);
       await writeLog({ guild: i.guild, category: 'moderation', action: 'clear', actorId: i.user.id, channelId: i.channel.id, message: `${deleted.size} mensajes eliminados.` });
-      return i.reply({ content: `Se eliminaron ${deleted.size} mensajes.`, ephemeral: true });
+      return i.reply({ content: `Se eliminaron ${deleted.size} mensajes.`, flags: EPHEMERAL });
     }
 
     if (sub === 'slowmode') {
       const seconds = i.options.getInteger('segundos');
       await i.channel.setRateLimitPerUser(seconds);
       await writeLog({ guild: i.guild, category: 'moderation', action: 'slowmode', actorId: i.user.id, channelId: i.channel.id, message: `${seconds}s` });
-      return i.reply({ content: `Slowmode configurado en ${seconds} segundos.`, ephemeral: true });
+      return i.reply({ content: `Slowmode configurado en ${seconds} segundos.`, flags: EPHEMERAL });
     }
 
     const user = i.options.getUser('usuario');
     const member = await i.guild.members.fetch(user.id).catch(() => null);
     const reason = i.options.getString('razon') || 'Sin razón especificada';
-    if (!member || !canModerate(i.member, member)) return i.reply({ content: 'No puedes moderar a ese usuario por jerarquía.', ephemeral: true });
+    if (!member || !canModerate(i.member, member)) return i.reply({ content: 'No puedes moderar a ese usuario por jerarquía.', flags: EPHEMERAL });
 
     if (sub === 'warn') {
       const row = await createWarning({ guildId: i.guild.id, target: user, moderator: i.user, reason });
       await writeLog({ guild: i.guild, category: 'moderation', action: 'warn', actorId: i.user.id, targetId: user.id, message: reason, metadata: { warningId: row.id } });
-      return i.reply({ content: `Advertencia registrada para <@${user.id}>.`, ephemeral: true });
+      return i.reply({ content: `Advertencia registrada para <@${user.id}>.`, flags: EPHEMERAL });
     }
 
-    if (!canBotModerate(member)) return i.reply({ content: 'El bot no puede moderar a ese usuario por jerarquía.', ephemeral: true });
+    if (!canBotModerate(member)) return i.reply({ content: 'El bot no puede moderar a ese usuario por jerarquía.', flags: EPHEMERAL });
 
     if (sub === 'timeout') {
       const minutes = i.options.getInteger('minutos');
@@ -111,10 +112,10 @@ async function execute(i) {
     }
 
     await writeLog({ guild: i.guild, category: 'moderation', action: sub, actorId: i.user.id, targetId: user.id, message: reason });
-    return i.reply({ content: `Acción **${sub}** aplicada a <@${user.id}>.`, ephemeral: true });
+    return i.reply({ content: `Acción **${sub}** aplicada a <@${user.id}>.`, flags: EPHEMERAL });
   } catch (error) {
     console.error(error);
-    return i.reply({ content: 'No se pudo completar la acción.', ephemeral: true });
+    return i.reply({ content: 'No se pudo completar la acción.', flags: EPHEMERAL });
   }
 }
 
