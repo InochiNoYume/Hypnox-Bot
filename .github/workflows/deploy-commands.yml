@@ -28,7 +28,6 @@ jobs:
         uses: actions/setup-node@v5
         with:
           node-version: 22.x
-          cache: false
       - name: Install dependencies
         run: npm install --ignore-scripts
       - name: Verify command definitions
