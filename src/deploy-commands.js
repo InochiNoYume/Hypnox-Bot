@@ -1,7 +1,7 @@
 require('dotenv').config();
 
 const { REST, Routes } = require('discord.js');
-const { validateEnv, getGuildIds, getEnv } = require('./config/env');
+const { getGuildIds, getEnv } = require('./config/env');
 const { validateCommands } = require('./utils/validateCommands');
 const loadCommands = require('./handlers/loadCommands');
 
@@ -69,6 +69,29 @@ function expectedForGuild(commands, guildType) {
     .map((command) => command.data.toJSON());
 }
 
+function validateDeployEnv() {
+  const required = [
+    'DISCORD_TOKEN',
+    'DISCORD_CLIENT_ID',
+    'OFFICIAL_GUILD_ID',
+    'STAFF_GUILD_ID',
+    'APPLICATIONS_GUILD_ID'
+  ];
+  const missing = required.filter((key) => !getEnv(key));
+  if (missing.length) throw new Error(`Variables necesarias para registrar comandos faltantes: ${missing.join(', ')}`);
+
+  const token = getEnv('DISCORD_TOKEN');
+  if (/\s/.test(token)) throw new Error('DISCORD_TOKEN parece inválido: contiene espacios o saltos de línea.');
+
+  const idPattern = /^\d{17,20}$/;
+  const invalid = ['DISCORD_CLIENT_ID', 'OFFICIAL_GUILD_ID', 'STAFF_GUILD_ID', 'APPLICATIONS_GUILD_ID', 'DISCORD_DEV_GUILD_ID']
+    .map((key) => [key, getEnv(key)])
+    .filter(([, value]) => value && !idPattern.test(String(value)))
+    .map(([key]) => key);
+
+  if (invalid.length) throw new Error(`Snowflakes de Discord inválidos en: ${invalid.join(', ')}`);
+}
+
 async function requestWithRetry(request, label) {
   let lastError;
 
@@ -113,7 +136,7 @@ async function syncGuildCommands(rest, guildType, guildId, commands) {
 }
 
 async function deploy() {
-  validateEnv();
+  validateDeployEnv();
 
   const rest = new REST({ version: '10' }).setToken(getEnv('DISCORD_TOKEN'));
   const guildIds = getGuildIds();
@@ -132,4 +155,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { deploy, loadCommandData, expectedForGuild, commandsEqual, syncGuildCommands };
+module.exports = { deploy, loadCommandData, expectedForGuild, commandsEqual, syncGuildCommands, validateDeployEnv };
