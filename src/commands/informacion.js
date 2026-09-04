@@ -1,16 +1,18 @@
-const { SlashCommandBuilder } = require('discord.js');
+const { SlashCommandBuilder, MessageFlags } = require('discord.js');
 const { getGuildType } = require('../utils/guild');
 const { isAdminOrHigher, getConfiguredChannel, accessDenied, missingChannel, base } = require('../utils/postulacionesPanels');
+
+const EPHEMERAL = MessageFlags.Ephemeral;
 
 const data = new SlashCommandBuilder()
   .setName('informacion')
   .setDescription('Publica la información general del proceso de Staff.');
 
 async function execute(interaction) {
-  if (getGuildType(interaction.guildId) !== 'applications') return interaction.reply({ content: 'Este comando solo está disponible en el Discord Staff Applications.', ephemeral: true });
-  if (!isAdminOrHigher(interaction.member)) return interaction.reply({ content: accessDenied(), ephemeral: true });
+  if (getGuildType(interaction.guildId) !== 'applications') return interaction.reply({ content: 'Este comando solo está disponible en el Discord Staff Applications.', flags: EPHEMERAL });
+  if (!isAdminOrHigher(interaction.member)) return interaction.reply({ content: accessDenied(), flags: EPHEMERAL });
   const { channel, envKey } = await getConfiguredChannel(interaction, 'informacion');
-  if (!channel) return interaction.reply({ content: missingChannel(envKey || 'APPLICATIONS_CHANNEL_INFORMATION_ID'), ephemeral: true });
+  if (!channel) return interaction.reply({ content: missingChannel(envKey || 'APPLICATIONS_CHANNEL_INFORMATION_ID'), flags: EPHEMERAL });
 
   const embed = base('INFORMACIÓN DE POSTULACIONES', 'Información general sobre el proceso de incorporación al Staff de Hypnox Studios.');
   embed.addFields(
@@ -22,7 +24,7 @@ async function execute(interaction) {
   );
   embed.setFooter({ text: 'Hypnox Studios • Información de Postulaciones' });
   await channel.send({ embeds: [embed] });
-  return interaction.reply({ content: `Información publicada en <#${channel.id}>.`, ephemeral: true });
+  return interaction.reply({ content: `Información publicada en <#${channel.id}>.`, flags: EPHEMERAL });
 }
 
 module.exports = { data, execute, guilds: ['applications'] };
