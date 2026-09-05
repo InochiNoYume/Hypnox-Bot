@@ -1,34 +1,9 @@
 const { SlashCommandBuilder, MessageFlags } = require('discord.js');
-const { getGuildType } = require('../utils/guild');
-const { isAdminOrHigher, getConfiguredChannel, accessDenied, missingChannel, base } = require('../utils/postulacionesPanels');
-
-const EPHEMERAL = MessageFlags.Ephemeral;
-
-const data = new SlashCommandBuilder()
-  .setName('reglamento-interno')
-  .setDescription('Publica el Reglamento Interno en el servidor Staff.');
-
-async function execute(interaction) {
-  if (getGuildType(interaction.guildId) !== 'staff') return interaction.reply({ content: 'Este comando solo está disponible en el Discord Staff Team.', flags: EPHEMERAL });
-  if (!isAdminOrHigher(interaction.member)) return interaction.reply({ content: accessDenied(), flags: EPHEMERAL });
-
-  const { channel, envKey } = await getConfiguredChannel(interaction, 'reglamento');
-  if (!channel) return interaction.reply({ content: missingChannel(envKey || 'STAFF_CHANNEL_INTERNAL_RULES_ID'), flags: EPHEMERAL });
-
-  const embed = base('REGLAMENTO INTERNO', 'Normativa interna de Hypnox Studios para el funcionamiento del equipo Staff.');
-  embed.addFields(
-    { name: '◆ CONDUCTA', value: 'Mantén una actitud profesional, respetuosa y responsable con todo el equipo. Las diferencias internas deben resolverse por los canales correspondientes.', inline: false },
-    { name: '◆ RESPONSABILIDAD', value: 'Cada miembro debe cumplir las funciones de su puesto, respetar las indicaciones de sus superiores y comunicar cualquier inconveniente que afecte su trabajo.', inline: false },
-    { name: '◆ CONFIDENCIALIDAD', value: 'La información interna, documentos, conversaciones, proyectos y decisiones de Staff no deben compartirse fuera de los espacios autorizados.', inline: false },
-    { name: '◆ ACTIVIDAD', value: 'Se espera participación y compromiso acorde al cargo. Si no puedes cumplir tus funciones durante un periodo, informa previamente a la Dirección.', inline: false },
-    { name: '◆ PROYECTOS', value: 'Los proyectos deben seguir la planificación establecida y mantenerse coordinados con el responsable correspondiente. No se deben realizar cambios relevantes sin autorización cuando afecten al proyecto.', inline: false },
-    { name: '◆ MODERACIÓN', value: 'Las acciones de moderación deben ser proporcionales, justificadas y registradas cuando corresponda. No se permite utilizar los permisos para beneficio personal.', inline: false },
-    { name: '◆ INCUMPLIMIENTOS', value: 'El incumplimiento del reglamento puede derivar en advertencias, suspensión de funciones o retiro del Staff, según la gravedad y las circunstancias.', inline: false }
-  );
-  embed.setFooter({ text: 'Hypnox Studios • Reglamento Interno Staff' });
-
-  await channel.send({ embeds: [embed] });
-  return interaction.reply({ content: `Reglamento Interno publicado en <#${channel.id}>.`, flags: EPHEMERAL });
+const { getGuildType } = require('../utils/guild'); const { isAdminOrHigher, getConfiguredChannel, accessDenied, missingChannel, base } = require('../utils/postulacionesPanels');
+const EPHEMERAL=MessageFlags.Ephemeral;
+const data=new SlashCommandBuilder().setName('reglamento-interno').setDescription('Publica el Reglamento Interno en el servidor Staff.');
+async function execute(interaction){
+ if(getGuildType(interaction.guildId)!=='staff')return interaction.reply({content:'Este comando solo está disponible en el Discord Staff Team.',flags:EPHEMERAL});if(!isAdminOrHigher(interaction.member))return interaction.reply({content:accessDenied(),flags:EPHEMERAL});await interaction.deferReply({flags:EPHEMERAL});
+ try{const {channel,envKey}=await getConfiguredChannel(interaction,'reglamento');if(!channel)return interaction.editReply({content:missingChannel(envKey||'STAFF_CHANNEL_INTERNAL_RULES_ID')});const embed=base('REGLAMENTO INTERNO','Normativa interna de Hypnox Studios para el funcionamiento del equipo Staff.');embed.addFields({name:'◆ CONDUCTA',value:'Mantén una actitud profesional, respetuosa y responsable con todo el equipo. Las diferencias internas deben resolverse por los canales correspondientes.'},{name:'◆ RESPONSABILIDAD',value:'Cada miembro debe cumplir las funciones de su puesto, respetar las indicaciones de sus superiores y comunicar cualquier inconveniente que afecte su trabajo.'},{name:'◆ CONFIDENCIALIDAD',value:'La información interna, documentos, conversaciones, proyectos y decisiones de Staff no deben compartirse fuera de los espacios autorizados.'},{name:'◆ ACTIVIDAD',value:'Se espera participación y compromiso acorde al cargo. Si no puedes cumplir tus funciones durante un periodo, informa previamente a la Dirección.'},{name:'◆ PROYECTOS',value:'Los proyectos deben seguir la planificación establecida y mantenerse coordinados con el responsable correspondiente. No se deben realizar cambios relevantes sin autorización cuando afecten al proyecto.'},{name:'◆ MODERACIÓN',value:'Las acciones de moderación deben ser proporcionales, justificadas y registradas cuando corresponda. No se permite utilizar los permisos para beneficio personal.'},{name:'◆ INCUMPLIMIENTOS',value:'El incumplimiento del reglamento puede derivar en advertencias, suspensión de funciones o retiro del Staff, según la gravedad y las circunstancias.'});embed.setFooter({text:'Hypnox Studios • Reglamento Interno Staff'});await channel.send({embeds:[embed]});return interaction.editReply({content:`Reglamento Interno publicado en <#${channel.id}>.`});}catch(error){console.error('[HYPNOX] Internal rules error:',error);return interaction.editReply({content:'No se pudo publicar el Reglamento Interno.'}).catch(()=>{});}
 }
-
-module.exports = { data, execute, guilds: ['staff'] };
+module.exports={data,execute,guilds:['staff']};
