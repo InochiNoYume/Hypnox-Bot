@@ -1,7 +1,6 @@
 const { getGuildType } = require('../utils/guild');
 const { hasConfiguredRole } = require('../utils/permissions');
-
-const PREFIX = 'H!';
+const { getGuildPrefix, DEFAULT_PREFIX } = require('../services/guilds');
 
 function extractUserIds(content) {
   return [...String(content || '').matchAll(/<@!?(\d{17,20})>/g)].map((match) => match[1]);
@@ -179,9 +178,17 @@ function canUseCommand(interaction, command, guildType) {
 
 async function handlePrefixMessage(client, message) {
   if (message.author.bot || !message.guild) return;
-  if (!message.content.startsWith(PREFIX)) return;
 
-  const raw = message.content.slice(PREFIX.length).trim();
+  let prefix = DEFAULT_PREFIX;
+  try {
+    prefix = await getGuildPrefix(message.guild.id);
+  } catch (error) {
+    console.error(`[HYPNOX][PREFIX] No se pudo obtener el prefijo de ${message.guild.id}:`, error.message);
+  }
+
+  if (!message.content.startsWith(prefix)) return;
+
+  const raw = message.content.slice(prefix.length).trim();
   if (!raw) return;
 
   const parts = raw.split(/\s+/);
@@ -201,10 +208,10 @@ async function handlePrefixMessage(client, message) {
     return message.reply('No tienes el rol necesario para usar este comando.').catch(() => {});
   }
 
-  console.log(`[HYPNOX][PREFIX] Ejecutando H!${commandName}${parts.length ? ' (con argumentos)' : ''} en ${message.guild.id}.`);
+  console.log(`[HYPNOX][PREFIX] Ejecutando ${prefix}${commandName}${parts.length ? ' (con argumentos)' : ''} en ${message.guild.id}.`);
   const interaction = createPrefixInteraction(message, command, commandName, parts);
   await command.execute(interaction, client);
-  console.log(`[HYPNOX][PREFIX] H!${commandName} procesado correctamente.`);
+  console.log(`[HYPNOX][PREFIX] ${prefix}${commandName} procesado correctamente.`);
 }
 
 function registerPrefix(client) {
@@ -215,7 +222,7 @@ function registerPrefix(client) {
     });
   });
 
-  console.log(`[HYPNOX] Prefix habilitado: ${PREFIX}`);
+  console.log(`[HYPNOX] Prefix habilitado: ${DEFAULT_PREFIX} (configurable por servidor).`);
 }
 
 module.exports = registerPrefix;
