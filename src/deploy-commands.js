@@ -10,6 +10,7 @@ const MAX_ATTEMPTS = 3;
 const DISCORD_RUNTIME_FIELDS = new Set(['id', 'application_id', 'guild_id', 'version']);
 
 function withTimeout(promise, timeoutMs, message) {
+  let timer;
   return Promise.race([
     promise,
     new Promise((_, reject) => {
