@@ -1,11 +1,26 @@
 require('dotenv').config();
 
 const { REST, Routes } = require('discord.js');
-const { getEnv, getGuildIds, validateEnv } = require('../src/config/env');
+const { getEnv, getGuildIds } = require('../src/config/env');
 const { loadCommandData, expectedForGuild, commandsEqual } = require('../src/deploy-commands');
 
+function validateDiscordRegistrationEnv() {
+  const required = ['DISCORD_TOKEN', 'DISCORD_CLIENT_ID'];
+  const missing = required.filter((key) => !getEnv(key));
+  if (missing.length) throw new Error(`Variables de entorno faltantes para verificar comandos: ${missing.join(', ')}`);
+
+  const idPattern = /^\d{17,20}$/;
+  const invalid = ['DISCORD_CLIENT_ID', ...Object.keys(getGuildIds()).map((type) => `${type.toUpperCase()}_GUILD_ID`)]
+    .filter((key) => key === 'DISCORD_CLIENT_ID' || getEnv(key))
+    .map((key) => [key, key === 'DISCORD_CLIENT_ID' ? getEnv(key) : getGuildIds()[key.replace('_GUILD_ID', '').toLowerCase()]])
+    .filter(([, value]) => value && !idPattern.test(String(value)))
+    .map(([key]) => key);
+
+  if (invalid.length) throw new Error(`Snowflakes de Discord inválidos: ${invalid.join(', ')}`);
+}
+
 async function verify() {
-  validateEnv();
+  validateDiscordRegistrationEnv();
 
   const rest = new REST({ version: '10' }).setToken(getEnv('DISCORD_TOKEN'));
   const guilds = Object.entries(getGuildIds()).filter(([, guildId]) => guildId);
@@ -48,4 +63,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { verify };
+module.exports = { verify, validateDiscordRegistrationEnv };
