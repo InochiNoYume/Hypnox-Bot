@@ -186,9 +186,12 @@ async function syncGuildCommands(rest, guildType, guildId, commands) {
 async function deploy() {
   validateDeployEnv();
 
-  const rest = new REST({ version: '10' })
-    .setToken(getEnv('DISCORD_TOKEN'))
-    .setUserAgent('Hypnox-Bot/1.0');
+  const rest = new REST({
+    version: '10',
+    headers: {
+      'User-Agent': 'Hypnox-Bot/1.0'
+    }
+  }).setToken(getEnv('DISCORD_TOKEN'));
 
   const guildIds = getGuildIds();
   const commands = loadCommandData();
