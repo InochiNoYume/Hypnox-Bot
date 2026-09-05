@@ -64,6 +64,36 @@ async function setGuildPrefix(discordGuildId, prefix) {
   return data.prefix;
 }
 
+async function getGuildIp(discordGuildId) {
+  const row = await getGuildRow(discordGuildId);
+  return row?.server_ip || null;
+}
+
+async function setGuildIp(discordGuildId, ip) {
+  const value = String(ip || '').trim();
+  if (!value || value.length > 255 || /[\s<>`]/.test(value)) {
+    throw new Error('La IP/dirección del servidor no es válida.');
+  }
+
+  const { data, error } = await supabase
+    .from('guilds')
+    .update({ server_ip: value, updated_at: new Date().toISOString() })
+    .eq('discord_guild_id', discordGuildId)
+    .select('discord_guild_id, server_ip')
+    .single();
+
+  if (error) throw error;
+  return data.server_ip;
+}
+
+async function clearGuildIp(discordGuildId) {
+  const { error } = await supabase
+    .from('guilds')
+    .update({ server_ip: null, updated_at: new Date().toISOString() })
+    .eq('discord_guild_id', discordGuildId);
+  if (error) throw error;
+}
+
 function clearGuildPrefixCache(discordGuildId) {
   prefixCache.delete(discordGuildId);
 }
@@ -74,5 +104,8 @@ module.exports = {
   getGuildRow,
   getGuildPrefix,
   setGuildPrefix,
+  getGuildIp,
+  setGuildIp,
+  clearGuildIp,
   clearGuildPrefixCache
 };
