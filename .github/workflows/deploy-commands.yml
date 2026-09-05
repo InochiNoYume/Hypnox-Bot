@@ -9,6 +9,8 @@ on:
       - 'src/deploy-commands.js'
       - 'src/handlers/loadCommands.js'
       - 'src/utils/validateCommands.js'
+      - 'src/config/loadEnv.js'
+      - 'src/database/supabase.js'
       - '.github/workflows/deploy-commands.yml'
 
 jobs:
