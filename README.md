@@ -19,6 +19,162 @@ El bot utiliza una única aplicación de Discord y una única base de datos de S
 - `DISCORD_TOKEN` y `SUPABASE_SERVICE_ROLE_KEY` nunca deben publicarse.
 - No existe una aplicación web dependiente del bot.
 
+## Comandos
+
+Hypnox admite **dos formas de uso**:
+
+- **Slash commands:** `/comando` y `/comando subcomando`.
+- **Comandos de prefijo:** `!comando` y `!comando-subcomando`.
+
+El prefijo predeterminado es `!` y puede configurarse por servidor mediante el sistema de prefijos. Para los comandos con subcomandos se recomienda utilizar siempre la forma con guiones para evitar ambigüedades.
+
+### Ejemplos
+
+```text
+/help
+/help premios
+!help
+!help-premios
+```
+
+Para un comando con subcomando:
+
+```text
+Slash:   /tickets panel
+Prefijo: !tickets-panel
+
+Slash:   /premio crear
+Prefijo: !premio-crear
+
+Slash:   /evento crear
+Prefijo: !evento-crear
+
+Slash:   /moderacion warn
+Prefijo: !moderacion-warn
+```
+
+El parser de prefijo distingue el comando base y el subcomando incluso cuando el nombre del comando principal ya contiene guiones. Por ejemplo, `!evento-participar-unirse` se interpreta como el comando `evento-participar` con el subcomando `unirse`.
+
+### Información
+
+```text
+/ help inicio          → /help inicio
+!help-inicio           → panel general
+/info                   → !info
+/reglas                 → !reglas
+/roles                  → !roles
+/links                  → !links
+```
+
+### Comunidad
+
+```text
+/user                   → !user
+/serverinfo             → !serverinfo
+/credits                → !credits
+```
+
+### Moderación
+
+```text
+/moderacion warn       → !moderacion-warn
+/moderacion warnings   → !moderacion-warnings
+/moderacion unwarn     → !moderacion-unwarn
+/moderacion timeout    → !moderacion-timeout
+/moderacion clear      → !moderacion-clear
+/moderacion slowmode   → !moderacion-slowmode
+/moderacion kick       → !moderacion-kick
+/moderacion ban        → !moderacion-ban
+```
+
+### Tickets
+
+```text
+/tickets panel         → !tickets-panel
+/tickets cerrar        → !tickets-cerrar
+/tickets claim         → !tickets-claim
+/tickets add           → !tickets-add
+/tickets remove        → !tickets-remove
+```
+
+El panel de tickets incluye Soporte, Reporte, Alianza / Partner, Contacto, Bugs / Errores y Reclamar Beneficios Boost cuando el rol de Boost está configurado.
+
+### Anuncios
+
+```text
+/anuncio               → !anuncio
+/anuncio-programado crear    → !anuncio-programado-crear
+/anuncio-programado lista    → !anuncio-programado-lista
+/anuncio-programado cancelar → !anuncio-programado-cancelar
+```
+
+### Eventos
+
+```text
+/evento crear          → !evento-crear
+/evento editar         → !evento-editar
+/evento cancelar       → !evento-cancelar
+/evento iniciar        → !evento-iniciar
+/evento finalizar      → !evento-finalizar
+/evento-participar unirse     → !evento-participar-unirse
+/evento-participar salir      → !evento-participar-salir
+/evento-participantes  → !evento-participantes
+```
+
+### Premios
+
+```text
+/premio crear          → !premio-crear
+/premio finalizar      → !premio-finalizar
+/premio reroll         → !premio-reroll
+/premio entregar       → !premio-entregar
+```
+
+### Postulaciones
+
+```text
+/abierto               → !abierto
+/cerrado               → !cerrado
+/aceptado @usuario     → !aceptado @usuario
+/requisitos            → !requisitos
+/informacion           → !informacion
+/postular              → !postular
+/resultado @usuario    → !resultado @usuario
+/estado-postulacion    → !estado-postulacion
+/reglamento-interno    → !reglamento-interno
+```
+
+### Proyectos
+
+```text
+/proyecto crear        → !proyecto-crear
+/proyecto editar       → !proyecto-editar
+/proyecto estado       → !proyecto-estado
+/proyecto cerrar       → !proyecto-cerrar
+/proyecto asignar      → !proyecto-asignar
+```
+
+### Administración
+
+```text
+/administracion config          → !administracion-config
+/administracion set-channel     → !administracion-set-channel
+/administracion set-role        → !administracion-set-role
+/administracion set-permission  → !administracion-set-permission
+/administracion maintenance     → !administracion-maintenance
+/administracion reload          → !administracion-reload
+/auditoria usuario              → !auditoria-usuario
+/status                         → !status
+/reportes lista                 → !reportes-lista
+/reportes ver                   → !reportes-ver
+/reportes resolver              → !reportes-resolver
+/reportes rechazar              → !reportes-rechazar
+/encuesta crear                 → !encuesta-crear
+/encuesta cerrar                → !encuesta-cerrar
+```
+
+Los comandos disponibles dependen del servidor y de los permisos o roles configurados. `/help` y `!help` muestran el centro de ayuda correspondiente.
+
 ## Autoroles
 
 El bot asigna automáticamente un rol cuando un usuario entra a los servidores correspondientes:
@@ -55,12 +211,17 @@ El sistema de tickets funciona **únicamente en Official Discord** mediante un p
 | Alianza / Partner | Helper en adelante |
 | Contacto | Administrator, Director y Founder |
 | Bugs / Errores | Developer, Producer, Administrator, Director y Founder |
+| Reclamar Beneficios Boost | Todos los Staff pueden atender; solo usuarios con `OFFICIAL_ROLE_BOOST_ID` pueden abrirlo |
 
 Los permisos se resuelven mediante IDs de roles configurados en las variables de entorno.
 
 Al reclamar un ticket, el resto de los roles de atención pierde el acceso al canal y se conserva el acceso del creador y del miembro que lo reclamó. Los usuarios con permiso de Administrador de Discord pueden seguir accediendo porque Discord permite que `Administrator` omita los overwrites de canales.
 
 La categoría **Bugs / Errores** registra específicamente los fallos técnicos y está disponible para Developer y Producer, además de Dirección y Administración.
+
+### Asistencia Oral
+
+Cada ticket dispone de un botón **Asistencia Oral** para el Staff autorizado. Al utilizarlo se crea un canal de voz `asistencia-oral` dentro de la categoría del ticket, con acceso para el creador y el Staff correspondiente. No se crean canales duplicados y el canal se elimina al cerrar el ticket.
 
 ### Formularios
 
@@ -69,8 +230,9 @@ La categoría **Bugs / Errores** registra específicamente los fallos técnicos 
 - **Alianza / Partner:** tipo, servidor/comunidad, propuesta, miembros y contacto.
 - **Contacto:** asunto, motivo, detalles y evidencia opcional.
 - **Bugs / Errores:** asunto, descripción, pasos para reproducir y evidencia opcional.
+- **Boost:** asunto, cantidad de Boosts, detalles y evidencia.
 
-Los valores de interfaz se normalizan antes de guardarse en Supabase. La base de datos acepta actualmente `support`, `report`, `alliance_partner`, `contact` y `bugs`.
+Los valores de interfaz se normalizan antes de guardarse en Supabase. La base de datos acepta actualmente `support`, `report`, `alliance_partner`, `contact`, `bugs` y `boost`.
 
 ## Eventos y participación
 
@@ -98,7 +260,7 @@ Las participaciones utilizan el ID de Discord como referencia operativa y los da
 
 - **Información:** help, reglas, links e información general.
 - **Moderación:** warn, warnings, unwarn, timeout, clear, slowmode, kick y ban.
-- **Tickets:** panel, formularios, creación, claim, cierre, adición y retirada de usuarios.
+- **Tickets:** panel, formularios, creación, claim, cierre, adición, retirada y asistencia oral.
 - **Anuncios:** publicaciones oficiales con embed negro e imagen configurable.
 - **Anuncios programados:** programación y publicación automática de comunicaciones.
 - **Eventos:** creación, edición, ciclo de vida y participación de miembros.
@@ -112,7 +274,27 @@ Las participaciones utilizan el ID de Discord como referencia operativa y los da
 
 ## Ayuda
 
-`/help inicio` muestra las categorías disponibles. La disponibilidad de las funciones se filtra mediante los IDs de roles configurados para cada servidor.
+`/help inicio` o `!help-inicio` muestran las categorías disponibles. Para consultar una categoría:
+
+```text
+/help premios
+!help-premios
+```
+
+La disponibilidad de las funciones se filtra mediante los IDs de roles configurados para cada servidor.
+
+## Registro de comandos Slash
+
+Los comandos `/` se registran mediante **Discord REST API v10** usando `discord.js`. El registro utiliza las rutas de comandos por guild de Discord y no depende del Gateway. discord.js expone específicamente la ruta `applicationGuildCommands(applicationId, guildId)` para registrar comandos de una guild. citeturn0search0turn0search2
+
+El proyecto dispone de:
+
+```text
+npm run deploy
+npm run verify:discord
+```
+
+El workflow de GitHub Actions instala las dependencias, valida las definiciones, registra los comandos y finalmente comprueba que las guilds tengan exactamente los comandos esperados.
 
 ## Configuración
 
@@ -131,13 +313,19 @@ La configuración operativa se mantiene fuera del código.
 
 ### Official Discord
 
-Incluye IDs para Dirección, Administración, moderación, **Developer**, **Producer**, canales de tickets, anuncios, postulaciones, información, FAQ y reglamento.
+Incluye IDs para Dirección, Administración, moderación, **Developer**, **Producer**, **Boost**, canales de tickets, anuncios, postulaciones, información, FAQ y reglamento.
 
 Para Bugs / Errores son necesarias las siguientes variables si se quiere habilitar ese acceso:
 
 ```env
 OFFICIAL_ROLE_DEVELOPER_ID=
 OFFICIAL_ROLE_PRODUCER_ID=
+```
+
+Para Reclamar Beneficios Boost:
+
+```env
+OFFICIAL_ROLE_BOOST_ID=
 ```
 
 `OFFICIAL_TICKET_STAFF_MENTION_ROLE_ID` es opcional y se utiliza únicamente para mencionar el rol configurado al crear un ticket.
@@ -186,6 +374,7 @@ Las migraciones se encuentran en `database/migrations/`.
 - `20260903120100_protect_ticket_assignment_race.sql`: protege la asignación concurrente de tickets.
 - `20260903120927_harden_ticket_assignment_function_search_path.sql`: endurece la función de asignación de tickets.
 - `20260903141941_enforce_one_open_ticket_per_user.sql`: limita a un ticket abierto por usuario.
+- `20260903222000_add_ticket_oral_voice_channel.sql`: añade el canal de voz de asistencia oral por ticket.
 - `20260903235113_revoke_public_trigger_function_execute.sql`: revoca ejecución pública de la función interna correspondiente.
 - `20260904010334_reports_polls_scheduled_announcements.sql`: añade reportes, encuestas y anuncios programados.
 - `20260904010829_add_event_participants.sql`: añade el registro de participantes por evento.
