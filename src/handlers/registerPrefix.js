@@ -109,14 +109,44 @@ function createPrefixOptions(message, command, subcommand, args) {
   };
 }
 
-function createPrefixInteraction(message, command, commandName, args) {
+function resolveCommandInvocation(client, rawCommand, args) {
+  const exact = client.commands.get(rawCommand);
+  if (exact) {
+    return { command: exact, commandName: rawCommand, subcommand: null, optionArgs: args };
+  }
+
+  const parts = rawCommand.split('-');
+  for (let split = parts.length - 1; split >= 1; split -= 1) {
+    const commandName = parts.slice(0, split).join('-');
+    const subcommand = parts.slice(split).join('-');
+    const command = client.commands.get(commandName);
+    if (!command) continue;
+
+    const subcommands = (command.data.options || [])
+      .filter((option) => option.type === 1)
+      .map((option) => option.name);
+
+    if (subcommands.includes(subcommand)) {
+      return {
+        command,
+        commandName,
+        subcommand,
+        optionArgs: args
+      };
+    }
+  }
+
+  return null;
+}
+
+function createPrefixInteraction(message, command, commandName, args, forcedSubcommand = null) {
   const guild = message.guild;
   const subcommands = (command.data.options || []).filter((option) => option.type === 1);
-  const requestedSubcommand = subcommands.length ? args[0]?.toLowerCase() : null;
+  const requestedSubcommand = forcedSubcommand || (subcommands.length ? args[0]?.toLowerCase() : null);
   const subcommand = requestedSubcommand && subcommands.some((option) => option.name === requestedSubcommand)
     ? requestedSubcommand
     : null;
-  const optionArgs = subcommand ? args.slice(1) : args;
+  const optionArgs = forcedSubcommand ? args : (subcommand ? args.slice(1) : args);
   const state = { replied: false, deferred: false, replyMessage: null };
 
   const reply = async (payload) => {
@@ -192,13 +222,14 @@ async function handlePrefixMessage(client, message) {
   if (!raw) return;
 
   const parts = raw.split(/\s+/);
-  const commandName = parts.shift().toLowerCase();
-  const command = client.commands.get(commandName);
-  if (!command) {
-    console.log(`[HYPNOX][PREFIX] Comando no encontrado: ${commandName}`);
+  const rawCommand = parts.shift().toLowerCase();
+  const invocation = resolveCommandInvocation(client, rawCommand, parts);
+  if (!invocation) {
+    console.log(`[HYPNOX][PREFIX] Comando no encontrado: ${rawCommand}`);
     return;
   }
 
+  const { command, commandName, subcommand, optionArgs } = invocation;
   const guildType = getGuildType(message.guild.id);
   if (!guildType || (guildType !== 'dev' && !(command.guilds || ['official', 'staff', 'applications']).includes(guildType))) {
     return message.reply('Este comando no está disponible en este servidor.').catch(() => {});
@@ -208,10 +239,10 @@ async function handlePrefixMessage(client, message) {
     return message.reply('No tienes el rol necesario para usar este comando.').catch(() => {});
   }
 
-  console.log(`[HYPNOX][PREFIX] Ejecutando ${prefix}${commandName}${parts.length ? ' (con argumentos)' : ''} en ${message.guild.id}.`);
-  const interaction = createPrefixInteraction(message, command, commandName, parts);
+  console.log(`[HYPNOX][PREFIX] Ejecutando ${prefix}${rawCommand} en ${message.guild.id}.`);
+  const interaction = createPrefixInteraction(message, command, commandName, optionArgs, subcommand);
   await command.execute(interaction, client);
-  console.log(`[HYPNOX][PREFIX] ${prefix}${commandName} procesado correctamente.`);
+  console.log(`[HYPNOX][PREFIX] ${prefix}${rawCommand} procesado correctamente.`);
 }
 
 function registerPrefix(client) {
