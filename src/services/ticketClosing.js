@@ -2,7 +2,7 @@ const { ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder, Button
 const { getGuildType } = require('../utils/guild');
 const { getTicket, updateTicket, addTicketEvent, getTicketCreatorDiscordId } = require('./tickets');
 const { getEnv } = require('../config/env');
-const { writeLog } = require('./logs');
+const { writeLog } = require('../services/logs');
 const { hasConfiguredRole } = require('../utils/permissions');
 const { brandedEmbed } = require('../utils/embeds');
 
@@ -93,8 +93,6 @@ async function confirmClose(interaction) {
     return interaction.reply({ content: 'Solo el personal autorizado mediante los roles configurados puede cerrar tickets.', flags: EPHEMERAL });
   }
 
-  // No hacemos consultas a Supabase antes de abrir el modal: Discord exige reconocer la interacción rápidamente.
-  // La existencia del ticket y el permiso específico por tipo se validan de nuevo al enviar el motivo.
   return interaction.showModal(buildCloseModal());
 }
 
@@ -193,6 +191,21 @@ async function generateTranscript(interaction) {
   }
 }
 
+async function deleteOralAssistanceChannel(interaction, ticket) {
+  if (!ticket?.oral_voice_channel_id) return;
+
+  const voice = await interaction.guild.channels.fetch(ticket.oral_voice_channel_id).catch(() => null);
+  if (voice) {
+    await voice.delete('Ticket cerrado: eliminar Asistencia Oral').catch((error) => {
+      console.error(`[HYPNOX] No se pudo eliminar la Asistencia Oral del ticket ${ticket.id}:`, error);
+    });
+  }
+
+  await updateTicket(ticket.id, { oral_voice_channel_id: null }).catch((error) => {
+    console.error(`[HYPNOX] No se pudo limpiar la referencia de Asistencia Oral del ticket ${ticket.id}:`, error);
+  });
+}
+
 async function closeTicketWithReason(interaction, reason) {
   await interaction.deferReply({ flags: EPHEMERAL });
 
@@ -219,7 +232,8 @@ async function closeTicketWithReason(interaction, reason) {
 
     await addTicketEvent(ticket.id, interaction.user.id, 'closed', cleanReason, {
       assigned_to_discord_user_id: ticket.assigned_to_discord_user_id || null,
-      reason: cleanReason
+      reason: cleanReason,
+      oral_voice_channel_id: ticket.oral_voice_channel_id || null
     });
 
     await writeLog({
@@ -232,7 +246,8 @@ async function closeTicketWithReason(interaction, reason) {
       metadata: {
         ticketId: ticket.id,
         reason: cleanReason,
-        assignedTo: ticket.assigned_to_discord_user_id || null
+        assignedTo: ticket.assigned_to_discord_user_id || null,
+        oralVoiceChannelId: ticket.oral_voice_channel_id || null
       }
     });
 
@@ -246,7 +261,9 @@ async function closeTicketWithReason(interaction, reason) {
     embed.setFooter({ text: 'Hypnox Studios • Sistema de atención' });
 
     await channel.send({ embeds: [embed] }).catch(() => {});
-    await interaction.editReply({ content: 'Ticket cerrado. El transcript fue guardado y el canal será eliminado en unos segundos.' });
+    await interaction.editReply({ content: 'Ticket cerrado. El transcript fue guardado y los canales serán eliminados en unos segundos.' });
+
+    await deleteOralAssistanceChannel(interaction, ticket);
 
     setTimeout(async () => {
       try {
