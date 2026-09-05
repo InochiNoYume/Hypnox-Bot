@@ -10,9 +10,11 @@ function validateDiscordRegistrationEnv() {
   if (missing.length) throw new Error(`Variables de entorno faltantes para verificar comandos: ${missing.join(', ')}`);
 
   const idPattern = /^\d{17,20}$/;
-  const invalid = ['DISCORD_CLIENT_ID', ...Object.keys(getGuildIds()).map((type) => `${type.toUpperCase()}_GUILD_ID`)]
-    .filter((key) => key === 'DISCORD_CLIENT_ID' || getEnv(key))
-    .map((key) => [key, key === 'DISCORD_CLIENT_ID' ? getEnv(key) : getGuildIds()[key.replace('_GUILD_ID', '').toLowerCase()]])
+  const values = [
+    ['DISCORD_CLIENT_ID', getEnv('DISCORD_CLIENT_ID')],
+    ...Object.entries(getGuildIds()).map(([guildType, guildId]) => [`${guildType.toUpperCase()}_GUILD_ID`, guildId])
+  ];
+  const invalid = values
     .filter(([, value]) => value && !idPattern.test(String(value)))
     .map(([key]) => key);
 
