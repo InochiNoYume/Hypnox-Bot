@@ -1,31 +1,9 @@
 const { SlashCommandBuilder, MessageFlags } = require('discord.js');
-const { getGuildType } = require('../utils/guild');
-const { isAdminOrHigher, getConfiguredChannel, accessDenied, missingChannel, base } = require('../utils/postulacionesPanels');
-
-const EPHEMERAL = MessageFlags.Ephemeral;
-
-const data = new SlashCommandBuilder()
-  .setName('requisitos')
-  .setDescription('Publica los requisitos para postular al Staff.');
-
-async function execute(interaction) {
-  if (getGuildType(interaction.guildId) !== 'applications') return interaction.reply({ content: 'Este comando solo está disponible en el Discord Staff Applications.', flags: EPHEMERAL });
-  if (!isAdminOrHigher(interaction.member)) return interaction.reply({ content: accessDenied(), flags: EPHEMERAL });
-  const { channel, envKey } = await getConfiguredChannel(interaction, 'requisitos');
-  if (!channel) return interaction.reply({ content: missingChannel(envKey || 'APPLICATIONS_CHANNEL_REQUIREMENTS_ID'), flags: EPHEMERAL });
-
-  const embed = base('REQUISITOS DE POSTULACIÓN', 'Antes de postular a Hypnox Studios, asegúrate de cumplir con los siguientes requisitos.');
-  embed.addFields(
-    { name: '◆ COMPROMISO', value: 'Contar con disponibilidad y disposición para colaborar de forma responsable dentro del equipo.', inline: false },
-    { name: '◆ MADUREZ Y RESPETO', value: 'Mantener una conducta respetuosa, profesional y adecuada para trabajar en equipo.', inline: false },
-    { name: '◆ EXPERIENCIA', value: 'La experiencia previa puede ser valorada según el cargo, pero no es requisito absoluto para todas las áreas.', inline: false },
-    { name: '◆ TRABAJO EN EQUIPO', value: 'Saber recibir indicaciones, comunicar problemas y colaborar con los demás integrantes.', inline: false },
-    { name: '◆ ACTIVIDAD', value: 'Mantener una participación razonable y cumplir las responsabilidades asumidas al ingresar.', inline: false },
-    { name: '◆ INFORMACIÓN REAL', value: 'La información entregada durante la postulación debe ser clara, coherente y honesta.', inline: false }
-  );
-  embed.setFooter({ text: 'Hypnox Studios • Requisitos de Staff' });
-  await channel.send({ embeds: [embed] });
-  return interaction.reply({ content: `Requisitos publicados en <#${channel.id}>.`, flags: EPHEMERAL });
+const { getGuildType } = require('../utils/guild'); const { isAdminOrHigher, getConfiguredChannel, accessDenied, missingChannel, base } = require('../utils/postulacionesPanels');
+const EPHEMERAL=MessageFlags.Ephemeral;
+const data=new SlashCommandBuilder().setName('requisitos').setDescription('Publica los requisitos para postular al Staff.');
+async function execute(interaction){
+ if(getGuildType(interaction.guildId)!=='applications')return interaction.reply({content:'Este comando solo está disponible en el Discord Staff Applications.',flags:EPHEMERAL});if(!isAdminOrHigher(interaction.member))return interaction.reply({content:accessDenied(),flags:EPHEMERAL});await interaction.deferReply({flags:EPHEMERAL});
+ try{const {channel,envKey}=await getConfiguredChannel(interaction,'requisitos');if(!channel)return interaction.editReply({content:missingChannel(envKey||'APPLICATIONS_CHANNEL_REQUIREMENTS_ID')});const embed=base('REQUISITOS DE POSTULACIÓN','Antes de postular a Hypnox Studios, asegúrate de cumplir con los siguientes requisitos.');embed.addFields({name:'◆ COMPROMISO',value:'Contar con disponibilidad y disposición para colaborar de forma responsable dentro del equipo.'},{name:'◆ MADUREZ Y RESPETO',value:'Mantener una conducta respetuosa, profesional y adecuada para trabajar en equipo.'},{name:'◆ EXPERIENCIA',value:'La experiencia previa puede ser valorada según el cargo, pero no es requisito absoluto para todas las áreas.'},{name:'◆ TRABAJO EN EQUIPO',value:'Saber recibir indicaciones, comunicar problemas y colaborar con los demás integrantes.'},{name:'◆ ACTIVIDAD',value:'Mantener una participación razonable y cumplir las responsabilidades asumidas al ingresar.'},{name:'◆ INFORMACIÓN REAL',value:'La información entregada durante la postulación debe ser clara, coherente y honesta.'});embed.setFooter({text:'Hypnox Studios • Requisitos de Staff'});await channel.send({embeds:[embed]});return interaction.editReply({content:`Requisitos publicados en <#${channel.id}>.`});}catch(error){console.error('[HYPNOX] Requirements error:',error);return interaction.editReply({content:'No se pudieron publicar los requisitos.'}).catch(()=>{});}
 }
-
-module.exports = { data, execute, guilds: ['applications'] };
+module.exports={data,execute,guilds:['applications']};
