@@ -19,7 +19,8 @@ const TICKET_ACCESS = {
   report: ['OFFICIAL_ROLE_FOUNDER_ID','OFFICIAL_ROLE_DIRECTOR_ID','OFFICIAL_ROLE_ADMINISTRATOR_ID','OFFICIAL_ROLE_SRMOD_ID','OFFICIAL_ROLE_MOD_ID','OFFICIAL_ROLE_TMOD_ID'],
   alliance_partner: ['OFFICIAL_ROLE_FOUNDER_ID','OFFICIAL_ROLE_DIRECTOR_ID','OFFICIAL_ROLE_ADMINISTRATOR_ID','OFFICIAL_ROLE_SRMOD_ID','OFFICIAL_ROLE_MOD_ID','OFFICIAL_ROLE_TMOD_ID','OFFICIAL_ROLE_HELPER_ID'],
   contact: ['OFFICIAL_ROLE_FOUNDER_ID','OFFICIAL_ROLE_DIRECTOR_ID','OFFICIAL_ROLE_ADMINISTRATOR_ID'],
-  bugs: ['OFFICIAL_ROLE_FOUNDER_ID','OFFICIAL_ROLE_DIRECTOR_ID','OFFICIAL_ROLE_ADMINISTRATOR_ID','OFFICIAL_ROLE_DEVELOPER_ID','OFFICIAL_ROLE_PRODUCER_ID']
+  bugs: ['OFFICIAL_ROLE_FOUNDER_ID','OFFICIAL_ROLE_DIRECTOR_ID','OFFICIAL_ROLE_ADMINISTRATOR_ID','OFFICIAL_ROLE_DEVELOPER_ID','OFFICIAL_ROLE_PRODUCER_ID'],
+  boost: STAFF_ROLE_ENVS
 };
 
 const data = new SlashCommandBuilder()
@@ -36,7 +37,8 @@ const labels = {
   reporte: 'Reporte',
   alianza: 'Alianza / Partner',
   contacto: 'Contacto',
-  bugs: 'Bugs / Errores'
+  bugs: 'Bugs / Errores',
+  boost: 'Reclamar Beneficios Boost'
 };
 
 const select = () => new ActionRowBuilder().addComponents(
@@ -96,6 +98,7 @@ async function execute(i) {
       '◆ **Alianza / Partner**', '> Solicitudes de colaboración, alianzas y propuestas entre Hypnox Studios y otras comunidades o proyectos.', '',
       '◆ **Contacto**', '> Comunicación directa con la dirección para asuntos administrativos o institucionales.', '',
       '◆ **Bugs / Errores**', '> Reporta errores técnicos, fallos de funcionamiento o problemas relacionados con sistemas, contenido o desarrollo. Estos casos serán revisados por Developer y Producer, además de la Dirección y Administración.', '',
+      '◆ **Reclamar Beneficios Boost**', '> Solicita los beneficios correspondientes por apoyar y boostear el servidor. Esta área está disponible exclusivamente para miembros que tengan el rol Boost.', '',
       '╭━━━━━━━━━━━━━━━━━━━━━━╮', '       **ANTES DE CREAR UN TICKET**', '╰━━━━━━━━━━━━━━━━━━━━━━╯', '',
       '> Selecciona únicamente el motivo que corresponda a tu solicitud.',
       '> Explica tu situación de forma clara y proporciona los datos necesarios.',
