@@ -1,122 +1,32 @@
 const { SlashCommandBuilder, MessageFlags } = require('discord.js');
-const { brandedEmbed } = require('../utils/embeds');
-const { getGuildType } = require('../utils/guild');
-const { hasAnyRole } = require('../utils/permissions');
-const { canModerate, canBotModerate } = require('../utils/moderation');
-const { createWarning, getWarnings, deactivateWarning, createModerationAction } = require('../services/moderation');
-const { writeLog } = require('../services/logs');
-
-const EPHEMERAL = MessageFlags.Ephemeral;
-const roleMap = {
-  helper: ['HELPER'],
-  tmod: ['TMOD', 'MOD', 'SRMOD', 'ADMINISTRATOR', 'DIRECTOR', 'FOUNDER'],
-  mod: ['MOD', 'SRMOD', 'ADMINISTRATOR', 'DIRECTOR', 'FOUNDER'],
-  srmod: ['SRMOD', 'ADMINISTRATOR', 'DIRECTOR', 'FOUNDER']
-};
-
-function allowed(member, level) {
-  const type = getGuildType(member.guild.id);
-  const prefix = type === 'staff' ? 'STAFF' : 'OFFICIAL';
-  return (roleMap[level] || []).some((role) => {
-    const roleName = type === 'staff' && role === 'ADMINISTRATOR' ? 'ADMINISTRATIVE_ASSISTANT' : role;
-    return hasAnyRole(member, type, [`${prefix}_ROLE_${roleName}_ID`]);
-  });
+const { brandedEmbed } = require('../utils/embeds'); const { getGuildType } = require('../utils/guild'); const { hasAnyRole } = require('../utils/permissions'); const { canModerate, canBotModerate } = require('../utils/moderation'); const { createWarning, getWarnings, deactivateWarning, createModerationAction } = require('../services/moderation'); const { writeLog } = require('../services/logs');
+const EPHEMERAL=MessageFlags.Ephemeral;
+const roleMap={helper:['HELPER'],tmod:['TMOD','MOD','SRMOD','ADMINISTRATOR','DIRECTOR','FOUNDER'],mod:['MOD','SRMOD','ADMINISTRATOR','DIRECTOR','FOUNDER'],srmod:['SRMOD','ADMINISTRATOR','DIRECTOR','FOUNDER']};
+function allowed(member,level){const type=getGuildType(member.guild.id);const prefix=type==='staff'?'STAFF':'OFFICIAL';return(roleMap[level]||[]).some(role=>{const roleName=type==='staff'&&role==='ADMINISTRATOR'?'ADMINISTRATIVE_ASSISTANT':role;return hasAnyRole(member,type,[`${prefix}_ROLE_${roleName}_ID`]);});}
+const command=new SlashCommandBuilder().setName('moderacion').setDescription('Herramientas de moderación y seguridad.')
+.addSubcommand(s=>s.setName('warn').setDescription('Registra una advertencia a un usuario.').addUserOption(o=>o.setName('usuario').setDescription('Usuario que recibirá la advertencia.').setRequired(true)).addStringOption(o=>o.setName('razon').setDescription('Motivo de la advertencia.')))
+.addSubcommand(s=>s.setName('warnings').setDescription('Consulta las advertencias activas de un usuario.').addUserOption(o=>o.setName('usuario').setDescription('Usuario a consultar.').setRequired(true)))
+.addSubcommand(s=>s.setName('unwarn').setDescription('Desactiva una advertencia existente.').addStringOption(o=>o.setName('id').setDescription('ID de la advertencia.').setRequired(true)))
+.addSubcommand(s=>s.setName('timeout').setDescription('Aplica un timeout a un usuario.').addUserOption(o=>o.setName('usuario').setDescription('Usuario que recibirá el timeout.').setRequired(true)).addIntegerOption(o=>o.setName('minutos').setDescription('Duración en minutos.').setMinValue(1).setMaxValue(40320).setRequired(true)).addStringOption(o=>o.setName('razon').setDescription('Motivo de la medida.')))
+.addSubcommand(s=>s.setName('clear').setDescription('Elimina mensajes recientes del canal.').addIntegerOption(o=>o.setName('cantidad').setDescription('Cantidad de mensajes.').setMinValue(1).setMaxValue(100).setRequired(true)))
+.addSubcommand(s=>s.setName('slowmode').setDescription('Configura el modo lento del canal.').addIntegerOption(o=>o.setName('segundos').setDescription('Intervalo entre mensajes.').setMinValue(0).setMaxValue(21600).setRequired(true)))
+.addSubcommand(s=>s.setName('kick').setDescription('Expulsa a un usuario del servidor.').addUserOption(o=>o.setName('usuario').setDescription('Usuario que será expulsado.').setRequired(true)).addStringOption(o=>o.setName('razon').setDescription('Motivo de la expulsión.')))
+.addSubcommand(s=>s.setName('ban').setDescription('Banea a un usuario del servidor.').addUserOption(o=>o.setName('usuario').setDescription('Usuario que será baneado.').setRequired(true)).addStringOption(o=>o.setName('razon').setDescription('Motivo del baneo.')));
+async function execute(i){
+ const sub=i.options.getSubcommand();const level={warn:'helper',warnings:'helper',unwarn:'tmod',timeout:'tmod',clear:'tmod',slowmode:'tmod',kick:'mod',ban:'srmod'}[sub];if(!allowed(i.member,level))return i.reply({content:'No tienes permisos para utilizar esta función.',flags:EPHEMERAL});
+ await i.deferReply({flags:EPHEMERAL});
+ try{
+  if(sub==='warnings'){const user=i.options.getUser('usuario',true);const rows=await getWarnings(i.guild.id,user);const active=rows.filter(r=>r.active);const embed=brandedEmbed('ADVERTENCIAS',`Registro de moderación de <@${user.id}>.`);embed.addFields({name:'◆ USUARIO',value:`<@${user.id}>`,inline:true},{name:'◆ ACTIVAS',value:`**${active.length}**`,inline:true},{name:'◆ DETALLE',value:active.slice(0,10).map(r=>`\`${r.id}\` — ${r.reason}`).join('\n')||'No registra advertencias activas.',inline:false});return i.editReply({embeds:[embed]});}
+  if(sub==='unwarn'){const id=i.options.getString('id',true);await deactivateWarning({guildId:i.guild.id,warningId:id});await writeLog({guild:i.guild,category:'moderation',action:'unwarn',actorId:i.user.id,message:id});return i.editReply({content:'La advertencia fue desactivada correctamente.'});}
+  if(sub==='clear'){const deleted=await i.channel.bulkDelete(i.options.getInteger('cantidad',true),true);await writeLog({guild:i.guild,category:'moderation',action:'clear',actorId:i.user.id,channelId:i.channel.id,message:`${deleted.size} mensajes eliminados.`});return i.editReply({content:`Se eliminaron ${deleted.size} mensajes.`});}
+  if(sub==='slowmode'){const seconds=i.options.getInteger('segundos',true);await i.channel.setRateLimitPerUser(seconds);await writeLog({guild:i.guild,category:'moderation',action:'slowmode',actorId:i.user.id,channelId:i.channel.id,message:`${seconds}s`});return i.editReply({content:`Slowmode configurado en ${seconds} segundos.`});}
+  const user=i.options.getUser('usuario',true);const member=await i.guild.members.fetch(user.id).catch(()=>null);const reason=i.options.getString('razon')||'Sin razón especificada';if(!member||!canModerate(i.member,member))return i.editReply({content:'No puedes moderar a ese usuario por jerarquía.'});
+  if(sub==='warn'){const row=await createWarning({guildId:i.guild.id,target:user,moderator:i.user,reason});await writeLog({guild:i.guild,category:'moderation',action:'warn',actorId:i.user.id,targetId:user.id,message:reason,metadata:{warningId:row.id}});return i.editReply({content:`Advertencia registrada para <@${user.id}>.`});}
+  if(!canBotModerate(member))return i.editReply({content:'El bot no puede moderar a ese usuario por jerarquía.'});
+  if(sub==='timeout'){const minutes=i.options.getInteger('minutos',true);await member.timeout(minutes*60000,reason);await createModerationAction({guildId:i.guild.id,target:user,moderator:i.user,actionType:'timeout',reason,durationSeconds:minutes*60});}
+  else if(sub==='kick'){await member.kick(reason);await createModerationAction({guildId:i.guild.id,target:user,moderator:i.user,actionType:'kick',reason});}
+  else{await member.ban({reason});await createModerationAction({guildId:i.guild.id,target:user,moderator:i.user,actionType:'ban',reason});}
+  await writeLog({guild:i.guild,category:'moderation',action:sub,actorId:i.user.id,targetId:user.id,message:reason});return i.editReply({content:`Acción **${sub}** aplicada a <@${user.id}>.`});
+ }catch(error){console.error('[HYPNOX] Moderation error:',error);return i.editReply({content:'No se pudo completar la acción.'}).catch(()=>{});}
 }
-
-const command = new SlashCommandBuilder()
-  .setName('moderacion')
-  .setDescription('Herramientas de moderación y seguridad.')
-  .addSubcommand((s) => s.setName('warn').setDescription('Registra una advertencia a un usuario.')
-    .addUserOption((o) => o.setName('usuario').setDescription('Usuario que recibirá la advertencia.').setRequired(true))
-    .addStringOption((o) => o.setName('razon').setDescription('Motivo de la advertencia.')))
-  .addSubcommand((s) => s.setName('warnings').setDescription('Consulta las advertencias activas de un usuario.')
-    .addUserOption((o) => o.setName('usuario').setDescription('Usuario a consultar.').setRequired(true)))
-  .addSubcommand((s) => s.setName('unwarn').setDescription('Desactiva una advertencia existente.')
-    .addStringOption((o) => o.setName('id').setDescription('ID de la advertencia.').setRequired(true)))
-  .addSubcommand((s) => s.setName('timeout').setDescription('Aplica un timeout a un usuario.')
-    .addUserOption((o) => o.setName('usuario').setDescription('Usuario que recibirá el timeout.').setRequired(true))
-    .addIntegerOption((o) => o.setName('minutos').setDescription('Duración en minutos.').setMinValue(1).setMaxValue(40320).setRequired(true))
-    .addStringOption((o) => o.setName('razon').setDescription('Motivo de la medida.')))
-  .addSubcommand((s) => s.setName('clear').setDescription('Elimina mensajes recientes del canal.')
-    .addIntegerOption((o) => o.setName('cantidad').setDescription('Cantidad de mensajes.').setMinValue(1).setMaxValue(100).setRequired(true)))
-  .addSubcommand((s) => s.setName('slowmode').setDescription('Configura el modo lento del canal.')
-    .addIntegerOption((o) => o.setName('segundos').setDescription('Intervalo entre mensajes.').setMinValue(0).setMaxValue(21600).setRequired(true)))
-  .addSubcommand((s) => s.setName('kick').setDescription('Expulsa a un usuario del servidor.')
-    .addUserOption((o) => o.setName('usuario').setDescription('Usuario que será expulsado.').setRequired(true))
-    .addStringOption((o) => o.setName('razon').setDescription('Motivo de la expulsión.')))
-  .addSubcommand((s) => s.setName('ban').setDescription('Banea a un usuario del servidor.')
-    .addUserOption((o) => o.setName('usuario').setDescription('Usuario que será baneado.').setRequired(true))
-    .addStringOption((o) => o.setName('razon').setDescription('Motivo del baneo.')));
-
-async function execute(i) {
-  const sub = i.options.getSubcommand();
-  const level = { warn: 'helper', warnings: 'helper', unwarn: 'tmod', timeout: 'tmod', clear: 'tmod', slowmode: 'tmod', kick: 'mod', ban: 'srmod' }[sub];
-  if (!allowed(i.member, level)) return i.reply({ content: 'No tienes permisos para utilizar esta función.', flags: EPHEMERAL });
-
-  try {
-    if (sub === 'warnings') {
-      const user = i.options.getUser('usuario');
-      const rows = await getWarnings(i.guild.id, user);
-      const active = rows.filter((row) => row.active);
-      const embed = brandedEmbed('ADVERTENCIAS', `Registro de moderación de <@${user.id}>.`);
-      embed.addFields(
-        { name: '◆ USUARIO', value: `<@${user.id}>`, inline: true },
-        { name: '◆ ACTIVAS', value: `**${active.length}**`, inline: true },
-        { name: '◆ DETALLE', value: active.slice(0, 10).map((row) => `\`${row.id}\` — ${row.reason}`).join('\n') || 'No registra advertencias activas.', inline: false }
-      );
-      return i.reply({ embeds: [embed], flags: EPHEMERAL });
-    }
-
-    if (sub === 'unwarn') {
-      await deactivateWarning({ guildId: i.guild.id, warningId: i.options.getString('id') });
-      await writeLog({ guild: i.guild, category: 'moderation', action: 'unwarn', actorId: i.user.id, message: i.options.getString('id') });
-      return i.reply({ content: 'La advertencia fue desactivada correctamente.', flags: EPHEMERAL });
-    }
-
-    if (sub === 'clear') {
-      const deleted = await i.channel.bulkDelete(i.options.getInteger('cantidad'), true);
-      await writeLog({ guild: i.guild, category: 'moderation', action: 'clear', actorId: i.user.id, channelId: i.channel.id, message: `${deleted.size} mensajes eliminados.` });
-      return i.reply({ content: `Se eliminaron ${deleted.size} mensajes.`, flags: EPHEMERAL });
-    }
-
-    if (sub === 'slowmode') {
-      const seconds = i.options.getInteger('segundos');
-      await i.channel.setRateLimitPerUser(seconds);
-      await writeLog({ guild: i.guild, category: 'moderation', action: 'slowmode', actorId: i.user.id, channelId: i.channel.id, message: `${seconds}s` });
-      return i.reply({ content: `Slowmode configurado en ${seconds} segundos.`, flags: EPHEMERAL });
-    }
-
-    const user = i.options.getUser('usuario');
-    const member = await i.guild.members.fetch(user.id).catch(() => null);
-    const reason = i.options.getString('razon') || 'Sin razón especificada';
-    if (!member || !canModerate(i.member, member)) return i.reply({ content: 'No puedes moderar a ese usuario por jerarquía.', flags: EPHEMERAL });
-
-    if (sub === 'warn') {
-      const row = await createWarning({ guildId: i.guild.id, target: user, moderator: i.user, reason });
-      await writeLog({ guild: i.guild, category: 'moderation', action: 'warn', actorId: i.user.id, targetId: user.id, message: reason, metadata: { warningId: row.id } });
-      return i.reply({ content: `Advertencia registrada para <@${user.id}>.`, flags: EPHEMERAL });
-    }
-
-    if (!canBotModerate(member)) return i.reply({ content: 'El bot no puede moderar a ese usuario por jerarquía.', flags: EPHEMERAL });
-
-    if (sub === 'timeout') {
-      const minutes = i.options.getInteger('minutos');
-      await member.timeout(minutes * 60000, reason);
-      await createModerationAction({ guildId: i.guild.id, target: user, moderator: i.user, actionType: 'timeout', reason, durationSeconds: minutes * 60 });
-    } else if (sub === 'kick') {
-      await member.kick(reason);
-      await createModerationAction({ guildId: i.guild.id, target: user, moderator: i.user, actionType: 'kick', reason });
-    } else {
-      await member.ban({ reason });
-      await createModerationAction({ guildId: i.guild.id, target: user, moderator: i.user, actionType: 'ban', reason });
-    }
-
-    await writeLog({ guild: i.guild, category: 'moderation', action: sub, actorId: i.user.id, targetId: user.id, message: reason });
-    return i.reply({ content: `Acción **${sub}** aplicada a <@${user.id}>.`, flags: EPHEMERAL });
-  } catch (error) {
-    console.error(error);
-    return i.reply({ content: 'No se pudo completar la acción.', flags: EPHEMERAL });
-  }
-}
-
-module.exports = { data: command, execute, guilds: ['official', 'staff'] };
+module.exports={data:command,execute,guilds:['official','staff']};
