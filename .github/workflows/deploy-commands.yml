@@ -11,6 +11,7 @@ on:
       - 'src/utils/validateCommands.js'
       - 'src/config/loadEnv.js'
       - 'src/database/supabase.js'
+      - 'scripts/verify-command-registration.js'
       - '.github/workflows/deploy-commands.yml'
 
 jobs:
