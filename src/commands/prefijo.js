@@ -67,6 +67,6 @@ async function execute(interaction) {
 module.exports = {
   data,
   execute,
-  guilds: ['official', 'staff', 'applications', 'dev'],
+  guilds: ['official', 'staff', 'applications'],
   access: { roleEnvs: MANAGEMENT_ROLES }
 };
