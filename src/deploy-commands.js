@@ -10,7 +10,6 @@ const MAX_ATTEMPTS = 3;
 const DISCORD_RUNTIME_FIELDS = new Set(['id', 'application_id', 'guild_id', 'version']);
 
 function withTimeout(promise, timeoutMs, message) {
-  let timer;
   return Promise.race([
     promise,
     new Promise((_, reject) => {
@@ -51,6 +50,20 @@ function commandMap(commands) {
   return new Map((commands || []).map((command) => [command.name, normalize(command)]));
 }
 
+function matchesExpected(expected, registered) {
+  if (Array.isArray(expected)) {
+    if (!Array.isArray(registered) || expected.length !== registered.length) return false;
+    return expected.every((value, index) => matchesExpected(value, registered[index]));
+  }
+
+  if (expected && typeof expected === 'object') {
+    if (!registered || typeof registered !== 'object' || Array.isArray(registered)) return false;
+    return Object.entries(expected).every(([key, value]) => matchesExpected(value, registered[key]));
+  }
+
+  return expected === registered;
+}
+
 function commandsEqual(expected, registered) {
   const expectedMap = commandMap(expected);
   const registeredMap = commandMap(registered);
@@ -58,7 +71,7 @@ function commandsEqual(expected, registered) {
 
   for (const [name, command] of expectedMap) {
     if (!registeredMap.has(name)) return false;
-    if (JSON.stringify(command) !== JSON.stringify(registeredMap.get(name))) return false;
+    if (!matchesExpected(command, registeredMap.get(name))) return false;
   }
   return true;
 }
