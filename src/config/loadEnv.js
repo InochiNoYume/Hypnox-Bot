@@ -3,7 +3,6 @@ const path = require('node:path');
 const dotenv = require('dotenv');
 
 const ENV_PATH = process.env.DOTENV_CONFIG_PATH || path.resolve(process.cwd(), '.env');
-const CRITICAL_KEYS = ['DISCORD_TOKEN', 'SUPABASE_URL', 'SUPABASE_SECRET_KEY', 'SUPABASE_SERVICE_ROLE_KEY'];
 let loaded = false;
 
 function isEncryptedValue(value) {
@@ -26,6 +25,12 @@ function loadEnv() {
   loaded = true;
 
   dotenv.config({ path: ENV_PATH, quiet: true });
+
+  // Slash commands are part of the normal bot lifecycle. An explicit environment
+  // value still wins, but the safe default is to synchronize them on READY.
+  if (process.env.SYNC_COMMANDS_ON_READY === undefined) {
+    process.env.SYNC_COMMANDS_ON_READY = 'true';
+  }
 
   if (criticalEnvironmentReady()) return;
 
