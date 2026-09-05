@@ -14,6 +14,8 @@ const MANAGEMENT_ROLES = [
   'APPLICATIONS_ROLE_ADMINISTRATOR_ID'
 ];
 
+const EMBED_COLOR = 0x2B2D31;
+
 const data = new SlashCommandBuilder()
   .setName('ip')
   .setDescription('Muestra la dirección del servidor.')
@@ -26,6 +28,7 @@ const data = new SlashCommandBuilder()
     .addStringOption((option) => option
       .setName('ip')
       .setDescription('IP, dominio o dirección de conexión del servidor.')
+      .setMinLength(1)
       .setMaxLength(255)
       .setRequired(true)))
   .addSubcommand((subcommand) => subcommand
@@ -34,10 +37,14 @@ const data = new SlashCommandBuilder()
 
 function createIpEmbed(ip, guild) {
   return new EmbedBuilder()
-    .setTitle('Conexión al servidor')
+    .setColor(EMBED_COLOR)
+    .setTitle('INFORMACIÓN DEL SERVIDOR')
     .setDescription('Utiliza la siguiente dirección para conectarte al servidor.')
-    .addFields({ name: 'Dirección', value: `\`${ip}\`` })
-    .setFooter({ text: `${guild.name} • Información del servidor` })
+    .addFields({
+      name: 'Dirección de conexión',
+      value: `\`\`\`\n${ip}\n\`\`\``
+    })
+    .setFooter({ text: `${guild.name} • Información oficial` })
     .setTimestamp();
 }
 
