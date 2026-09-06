@@ -33,15 +33,11 @@ const data = new SlashCommandBuilder()
     .setDescription(`Restablece el prefijo predeterminado (${DEFAULT_PREFIX}).`));
 
 async function execute(interaction) {
-  const subcommand = interaction.options.getSubcommand();
-
-  if (subcommand === 'ver') {
-    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
-  } else {
-    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
-  }
+  await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
   try {
+    const subcommand = interaction.options.getSubcommand();
+
     if (subcommand === 'ver') {
       const prefix = await getGuildPrefix(interaction.guild.id);
       return interaction.editReply({
