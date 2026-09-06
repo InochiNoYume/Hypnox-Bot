@@ -35,12 +35,17 @@ const data = new SlashCommandBuilder()
 async function execute(interaction) {
   const subcommand = interaction.options.getSubcommand();
 
+  if (subcommand === 'ver') {
+    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+  } else {
+    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+  }
+
   try {
     if (subcommand === 'ver') {
       const prefix = await getGuildPrefix(interaction.guild.id);
-      return interaction.reply({
-        content: `El prefijo actual de este servidor es: \`${prefix}\``,
-        flags: MessageFlags.Ephemeral
+      return interaction.editReply({
+        content: `El prefijo actual de este servidor es: \`${prefix}\``
       });
     }
 
@@ -49,18 +54,16 @@ async function execute(interaction) {
       : interaction.options.getString('prefijo', true).trim();
 
     const updated = await setGuildPrefix(interaction.guild.id, prefix);
-    return interaction.reply({
+    return interaction.editReply({
       content: subcommand === 'restablecer'
         ? `Prefijo restablecido a \`${updated}\`.`
-        : `Prefijo actualizado correctamente a \`${updated}\`.`,
-      flags: MessageFlags.Ephemeral
+        : `Prefijo actualizado correctamente a \`${updated}\`.`
     });
   } catch (error) {
     console.error('[HYPNOX][PREFIX] Error configurando prefijo:', error);
-    return interaction.reply({
-      content: error.message || 'No se pudo actualizar el prefijo.',
-      flags: MessageFlags.Ephemeral
-    });
+    return interaction.editReply({
+      content: error.message || 'No se pudo actualizar el prefijo.'
+    }).catch(() => {});
   }
 }
 
