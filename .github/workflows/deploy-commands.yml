@@ -8,10 +8,15 @@ on:
       - 'src/commands/**'
       - 'src/deploy-commands.js'
       - 'src/handlers/loadCommands.js'
+      - 'src/handlers/registerPrefix.js'
+      - 'src/handlers/registerEvents.js'
       - 'src/utils/validateCommands.js'
       - 'src/config/loadEnv.js'
+      - 'src/config/env.js'
       - 'src/database/supabase.js'
       - 'scripts/verify-command-registration.js'
+      - 'scripts/verify-supabase.js'
+      - 'database/migrations/**'
       - '.github/workflows/deploy-commands.yml'
 
 jobs:
@@ -19,11 +24,16 @@ jobs:
     runs-on: ubuntu-latest
     env:
       DISCORD_TOKEN: ${{ secrets.DISCORD_TOKEN }}
-      DISCORD_CLIENT_ID: '1544513944658387005'
-      OFFICIAL_GUILD_ID: '1497016616284721164'
-      STAFF_GUILD_ID: '1543522296432697445'
-      APPLICATIONS_GUILD_ID: '1544347040199221298'
-      DISCORD_DEV_GUILD_ID: '1544513315546337290'
+      DISCORD_CLIENT_ID: ${{ secrets.DISCORD_CLIENT_ID || '1544513944658387005' }}
+      OFFICIAL_GUILD_ID: ${{ secrets.OFFICIAL_GUILD_ID || '1497016616284721164' }}
+      STAFF_GUILD_ID: ${{ secrets.STAFF_GUILD_ID || '1543522296432697445' }}
+      APPLICATIONS_GUILD_ID: ${{ secrets.APPLICATIONS_GUILD_ID || '1544347040199221298' }}
+      DISCORD_DEV_GUILD_ID: ${{ secrets.DISCORD_DEV_GUILD_ID || '1544513315546337290' }}
+      DEV_GUILD_ID: ${{ secrets.DEV_GUILD_ID }}
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      SUPABASE_SECRET_KEYS: ${{ secrets.SUPABASE_SECRET_KEYS }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -38,6 +48,9 @@ jobs:
 
       - name: Verify command definitions
         run: npm run validate
+
+      - name: Verify Supabase configuration
+        run: npm run verify:supabase
 
       - name: Deploy slash commands
         run: npm run deploy
