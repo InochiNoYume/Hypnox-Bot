@@ -20,21 +20,28 @@ const data = new SlashCommandBuilder()
   .addUserOption((option) => option.setName('usuario10').setDescription('Décimo usuario aceptado.').setRequired(false));
 
 async function execute(interaction) {
-  const channelId = getEnv('OFFICIAL_CHANNEL_APPLICATIONS_ID');
-  const channel = channelId ? await interaction.guild.channels.fetch(channelId).catch(() => null) : null;
-  if (!channel?.isTextBased()) return interaction.reply({ content: 'Configura OFFICIAL_CHANNEL_APPLICATIONS_ID antes de publicar resultados.', flags: EPHEMERAL });
+  await interaction.deferReply({ flags: EPHEMERAL });
 
-  const users = Array.from({ length: 10 }, (_, index) => interaction.options.getUser(`usuario${index + 1}`)).filter(Boolean);
-  const mentions = users.map((user) => `◆ <@${user.id}>`).join('\n');
-  const image = getEnv('APPLICATIONS_IMAGE_RESULTS') || getEnv('OFFICIAL_IMAGE_ANNOUNCEMENT') || getEnv('OFFICIAL_IMAGE_BANNER');
+  try {
+    const channelId = getEnv('OFFICIAL_CHANNEL_APPLICATIONS_ID');
+    const channel = channelId ? await interaction.guild.channels.fetch(channelId).catch(() => null) : null;
+    if (!channel?.isTextBased()) return interaction.editReply({ content: 'Configura OFFICIAL_CHANNEL_APPLICATIONS_ID antes de publicar resultados.' });
 
-  const embed = brandedEmbed('RESULTADOS DE POSTULACIÓN', 'El proceso de selección ha finalizado. Las siguientes personas han sido aceptadas para formar parte del Staff de Hypnox Studios.', { image });
-  embed.addFields({ name: 'USUARIOS ACEPTADOS', value: mentions, inline: false });
-  embed.setFooter({ text: 'Hypnox Studios • Resultados de Staff' });
+    const users = Array.from({ length: 10 }, (_, index) => interaction.options.getUser(`usuario${index + 1}`)).filter(Boolean);
+    const mentions = users.map((user) => `◆ <@${user.id}>`).join('\n');
+    const image = getEnv('APPLICATIONS_IMAGE_RESULTS') || getEnv('OFFICIAL_IMAGE_ANNOUNCEMENT') || getEnv('OFFICIAL_IMAGE_BANNER');
 
-  await channel.send({ embeds: [embed] });
-  await writeLog({ guild: interaction.guild, category: 'application', action: 'accepted', actorId: interaction.user.id, channelId: channel.id, message: users.map((user) => user.id).join(',') });
-  return interaction.reply({ content: `Resultado publicado en <#${channel.id}>.`, flags: EPHEMERAL });
+    const embed = brandedEmbed('RESULTADOS DE POSTULACIÓN', 'El proceso de selección ha finalizado. Las siguientes personas han sido aceptadas para formar parte del Staff de Hypnox Studios.', { image });
+    embed.addFields({ name: 'USUARIOS ACEPTADOS', value: mentions, inline: false });
+    embed.setFooter({ text: 'Hypnox Studios • Resultados de Staff' });
+
+    await channel.send({ embeds: [embed] });
+    await writeLog({ guild: interaction.guild, category: 'application', action: 'accepted', actorId: interaction.user.id, channelId: channel.id, message: users.map((user) => user.id).join(',') });
+    return interaction.editReply({ content: `Resultado publicado en <#${channel.id}>.` });
+  } catch (error) {
+    console.error('[HYPNOX] Aceptado error:', error);
+    return interaction.editReply({ content: 'No se pudo publicar el resultado. El error fue registrado para revisión.' }).catch(() => {});
+  }
 }
 
 module.exports = { data, execute, guilds: ['official'], access: { roleEnvs: ['OFFICIAL_ROLE_FOUNDER_ID', 'OFFICIAL_ROLE_DIRECTOR_ID', 'OFFICIAL_ROLE_ADMINISTRATOR_ID'] } };
