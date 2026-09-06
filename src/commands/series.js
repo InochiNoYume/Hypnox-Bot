@@ -43,8 +43,9 @@ function dateTag(value) {
 
 async function execute(interaction) {
   if (!canManage(interaction.member)) return interaction.reply({ content: 'No tienes permisos para gestionar series.', flags: EPHEMERAL });
+  await interaction.deferReply({ flags: EPHEMERAL });
   const guild = await getGuildRow(interaction.guildId);
-  if (!guild) return interaction.reply({ content: 'Servidor no registrado.', flags: EPHEMERAL });
+  if (!guild) return interaction.editReply({ content: 'Servidor no registrado.' });
 
   try {
     const sub = interaction.options.getSubcommand();
@@ -52,12 +53,12 @@ async function execute(interaction) {
       const start = new Date(interaction.options.getString('inicio'));
       const endText = interaction.options.getString('fin');
       const end = endText ? new Date(endText) : null;
-      if (Number.isNaN(start.getTime()) || (end && Number.isNaN(end.getTime()))) return interaction.reply({ content: 'Fecha ISO inválida.', flags: EPHEMERAL });
-      if (start <= new Date()) return interaction.reply({ content: 'La fecha de inicio debe ser futura.', flags: EPHEMERAL });
-      if (end && end <= start) return interaction.reply({ content: 'La fecha de finalización debe ser posterior al inicio.', flags: EPHEMERAL });
+      if (Number.isNaN(start.getTime()) || (end && Number.isNaN(end.getTime()))) return interaction.editReply({ content: 'Fecha ISO inválida.' });
+      if (start <= new Date()) return interaction.editReply({ content: 'La fecha de inicio debe ser futura.' });
+      if (end && end <= start) return interaction.editReply({ content: 'La fecha de finalización debe ser posterior al inicio.' });
       const title = interaction.options.getString('titulo', true).trim();
       const description = interaction.options.getString('descripcion', true).trim();
-      if (!title || !description) return interaction.reply({ content: 'El título y la descripción no pueden estar vacíos.', flags: EPHEMERAL });
+      if (!title || !description) return interaction.editReply({ content: 'El título y la descripción no pueden estar vacíos.' });
       const { data: series, error } = await supabase.from('series').insert({ guild_id: guild.id, channel_id: interaction.channelId, title, description, starts_at: start.toISOString(), ends_at: end?.toISOString() || null, created_by_discord_user_id: interaction.user.id }).select().single();
       if (error) throw error;
       const embed = brandedEmbed('SERIE', description, { footerText: 'Hypnox Studios • Gestión de series' });
@@ -66,17 +67,17 @@ async function execute(interaction) {
       const { error: messageError } = await supabase.from('series').update({ message_id: message.id }).eq('id', series.id).eq('guild_id', guild.id);
       if (messageError) throw messageError;
       await writeLog({ guild: interaction.guild, category: 'event', action: 'serie_creada', actorId: interaction.user.id, channelId: interaction.channelId, message: title, metadata: { seriesId: series.id } });
-      return interaction.reply({ content: `Serie creada: \`${series.id}\``, flags: EPHEMERAL });
+      return interaction.editReply({ content: `Serie creada: \`${series.id}\`` });
     }
 
     const id = interaction.options.getString('id', true);
     const { data: current, error } = await supabase.from('series').select('*').eq('id', id).eq('guild_id', guild.id).maybeSingle();
     if (error) throw error;
-    if (!current) return interaction.reply({ content: 'No se encontró la serie indicada.', flags: EPHEMERAL });
-    if (sub === 'iniciar' && current.status !== 'upcoming') return interaction.reply({ content: 'Solo puedes iniciar una serie programada.', flags: EPHEMERAL });
-    if (sub === 'finalizar' && current.status !== 'active') return interaction.reply({ content: 'Solo puedes finalizar una serie activa.', flags: EPHEMERAL });
-    if (sub === 'cancelar' && current.status === 'cancelled') return interaction.reply({ content: 'Esta serie ya está cancelada.', flags: EPHEMERAL });
-    if (sub === 'editar' && !['upcoming', 'active'].includes(current.status)) return interaction.reply({ content: 'Solo puedes editar una serie programada o activa.', flags: EPHEMERAL });
+    if (!current) return interaction.editReply({ content: 'No se encontró la serie indicada.' });
+    if (sub === 'iniciar' && current.status !== 'upcoming') return interaction.editReply({ content: 'Solo puedes iniciar una serie programada.' });
+    if (sub === 'finalizar' && current.status !== 'active') return interaction.editReply({ content: 'Solo puedes finalizar una serie activa.' });
+    if (sub === 'cancelar' && current.status === 'cancelled') return interaction.editReply({ content: 'Esta serie ya está cancelada.' });
+    if (sub === 'editar' && !['upcoming', 'active'].includes(current.status)) return interaction.editReply({ content: 'Solo puedes editar una serie programada o activa.' });
 
     const patch = { updated_at: new Date().toISOString() };
     if (sub === 'editar') {
@@ -84,20 +85,20 @@ async function execute(interaction) {
       const description = interaction.options.getString('descripcion');
       const startText = interaction.options.getString('inicio');
       const endText = interaction.options.getString('fin');
-      if (!title && !description && !startText && !endText) return interaction.reply({ content: 'Debes indicar al menos un campo.', flags: EPHEMERAL });
-      if (title !== null) { const value = title.trim(); if (!value) return interaction.reply({ content: 'El título no puede quedar vacío.', flags: EPHEMERAL }); patch.title = value; }
-      if (description !== null) { const value = description.trim(); if (!value) return interaction.reply({ content: 'La descripción no puede quedar vacía.', flags: EPHEMERAL }); patch.description = value; }
-      if (startText) { const d = new Date(startText); if (Number.isNaN(d.getTime()) || d <= new Date()) return interaction.reply({ content: 'Fecha de inicio inválida o no futura.', flags: EPHEMERAL }); patch.starts_at = d.toISOString(); }
-      if (endText) { const d = new Date(endText); const start = new Date(patch.starts_at || current.starts_at); if (Number.isNaN(d.getTime()) || d <= start) return interaction.reply({ content: 'Fecha de finalización inválida.', flags: EPHEMERAL }); patch.ends_at = d.toISOString(); }
+      if (!title && !description && !startText && !endText) return interaction.editReply({ content: 'Debes indicar al menos un campo.' });
+      if (title !== null) { const value = title.trim(); if (!value) return interaction.editReply({ content: 'El título no puede quedar vacío.' }); patch.title = value; }
+      if (description !== null) { const value = description.trim(); if (!value) return interaction.editReply({ content: 'La descripción no puede quedar vacía.' }); patch.description = value; }
+      if (startText) { const d = new Date(startText); if (Number.isNaN(d.getTime()) || d <= new Date()) return interaction.editReply({ content: 'Fecha de inicio inválida o no futura.' }); patch.starts_at = d.toISOString(); }
+      if (endText) { const d = new Date(endText); const start = new Date(patch.starts_at || current.starts_at); if (Number.isNaN(d.getTime()) || d <= start) return interaction.editReply({ content: 'Fecha de finalización inválida.' }); patch.ends_at = d.toISOString(); }
     } else patch.status = { iniciar: 'active', finalizar: 'finished', cancelar: 'cancelled' }[sub];
 
     const { data: updated, error: updateError } = await supabase.from('series').update(patch).eq('id', id).eq('guild_id', guild.id).select().single();
     if (updateError) throw updateError;
     await writeLog({ guild: interaction.guild, category: 'event', action: `serie_${sub}`, actorId: interaction.user.id, channelId: interaction.channelId, message: id, metadata: { previousStatus: current.status, newStatus: updated.status } });
-    return interaction.reply({ content: `Serie actualizada: ${updated.title}.`, flags: EPHEMERAL });
+    return interaction.editReply({ content: `Serie actualizada: ${updated.title}.` });
   } catch (error) {
     console.error('[HYPNOX] Series error:', error);
-    return interaction.reply({ content: 'No se pudo gestionar la serie.', flags: EPHEMERAL }).catch(() => {});
+    return interaction.editReply({ content: 'No se pudo gestionar la serie.' }).catch(() => {});
   }
 }
 
