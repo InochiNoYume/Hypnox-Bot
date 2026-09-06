@@ -16,7 +16,7 @@ on:
       - 'src/database/supabase.js'
       - 'scripts/verify-command-registration.js'
       - 'scripts/verify-supabase.js'
-      - 'database/migrations/**'
+      - 'supabase/migrations/**'
       - '.github/workflows/deploy-commands.yml'
 
 jobs:
