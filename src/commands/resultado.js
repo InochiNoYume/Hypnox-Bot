@@ -13,21 +13,29 @@ const data = new SlashCommandBuilder()
     .setRequired(true));
 
 async function execute(interaction) {
-  if (getGuildType(interaction.guildId) !== 'applications') return interaction.reply({ content: 'Este comando solo está disponible en el Discord Staff Applications.', flags: EPHEMERAL });
-  if (!isAdminOrHigher(interaction.member)) return interaction.reply({ content: accessDenied(), flags: EPHEMERAL });
-  const { channel, envKey } = await getConfiguredChannel(interaction, 'resultado');
-  if (!channel) return interaction.reply({ content: missingChannel(envKey || 'APPLICATIONS_CHANNEL_RESULTS_ID'), flags: EPHEMERAL });
+  await interaction.deferReply({ flags: EPHEMERAL });
 
-  const result = interaction.options.getString('resultado', true);
-  const embed = base('RESULTADO DE POSTULACIONES', 'La revisión de la convocatoria ha finalizado. A continuación se comunica el resultado correspondiente.');
-  embed.addFields(
-    { name: '◆ RESULTADO', value: result, inline: false },
-    { name: '◆ SIGUIENTE PASO', value: 'Las personas seleccionadas recibirán las indicaciones correspondientes por los medios oficiales de Hypnox Studios.', inline: false },
-    { name: '◆ AGRADECIMIENTO', value: 'Agradecemos a todas las personas que participaron y dedicaron su tiempo al proceso.', inline: false }
-  );
-  embed.setFooter({ text: 'Hypnox Studios • Resultados de Staff' });
-  await channel.send({ embeds: [embed] });
-  return interaction.reply({ content: `Resultado publicado en <#${channel.id}>.`, flags: EPHEMERAL });
+  try {
+    if (getGuildType(interaction.guildId) !== 'applications') return interaction.editReply({ content: 'Este comando solo está disponible en el Discord Staff Applications.' });
+    if (!isAdminOrHigher(interaction.member)) return interaction.editReply({ content: accessDenied() });
+
+    const { channel, envKey } = await getConfiguredChannel(interaction, 'resultado');
+    if (!channel) return interaction.editReply({ content: missingChannel(envKey || 'APPLICATIONS_CHANNEL_RESULTS_ID') });
+
+    const result = interaction.options.getString('resultado', true).trim();
+    const embed = base('RESULTADO DE POSTULACIONES', 'La revisión de la convocatoria ha finalizado. A continuación se comunica el resultado correspondiente.');
+    embed.addFields(
+      { name: '◆ RESULTADO', value: result, inline: false },
+      { name: '◆ SIGUIENTE PASO', value: 'Las personas seleccionadas recibirán las indicaciones correspondientes por los medios oficiales de Hypnox Studios.', inline: false },
+      { name: '◆ AGRADECIMIENTO', value: 'Agradecemos a todas las personas que participaron y dedicaron su tiempo al proceso.', inline: false }
+    );
+    embed.setFooter({ text: 'Hypnox Studios • Resultados de Staff' });
+    await channel.send({ embeds: [embed] });
+    return interaction.editReply({ content: `Resultado publicado en <#${channel.id}>.` });
+  } catch (error) {
+    console.error('[HYPNOX] Resultado error:', error);
+    return interaction.editReply({ content: 'No se pudo publicar el resultado. El error fue registrado para revisión.' }).catch(() => {});
+  }
 }
 
 module.exports = { data, execute, guilds: ['applications'] };
