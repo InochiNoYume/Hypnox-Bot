@@ -7,7 +7,29 @@ const loadCommands = require('./handlers/loadCommands');
 
 const REQUEST_TIMEOUT_MS = 15_000;
 const MAX_ATTEMPTS = 3;
-const DISCORD_RUNTIME_FIELDS = new Set(['id', 'application_id', 'guild_id', 'version']);
+const COMMAND_KEYS = new Set([
+  'type',
+  'name',
+  'description',
+  'options',
+  'default_member_permissions',
+  'dm_permission',
+  'nsfw'
+]);
+const OPTION_KEYS = new Set([
+  'type',
+  'name',
+  'description',
+  'required',
+  'choices',
+  'options',
+  'channel_types',
+  'autocomplete',
+  'min_value',
+  'max_value',
+  'min_length',
+  'max_length'
+]);
 
 function withTimeout(promise, timeoutMs, message) {
   let timer;
@@ -34,35 +56,61 @@ function loadCommandData() {
   }));
 }
 
-function normalize(value) {
-  if (Array.isArray(value)) return value.map(normalize);
-  if (value && typeof value === 'object') {
-    return Object.fromEntries(
-      Object.entries(value)
-        .filter(([key]) => !DISCORD_RUNTIME_FIELDS.has(key))
-        .sort(([a], [b]) => a.localeCompare(b))
-        .map(([key, val]) => [key, normalize(val)])
-    );
+function normalizePrimitive(value, key) {
+  if (key === 'default_member_permissions') {
+    return value == null ? null : String(value);
   }
   return value;
 }
 
-function commandMap(commands) {
-  return new Map((commands || []).map((command) => [command.name, normalize(command)]));
+function normalizeChoice(choice) {
+  if (!choice || typeof choice !== 'object') return choice;
+  const result = {};
+  for (const key of ['name', 'value']) {
+    if (key in choice) result[key] = normalize(choice[key], key);
+  }
+  return result;
 }
 
-function matchesExpected(expected, registered) {
-  if (Array.isArray(expected)) {
-    if (!Array.isArray(registered) || expected.length !== registered.length) return false;
-    return expected.every((value, index) => matchesExpected(value, registered[index]));
+function normalizeOption(option) {
+  if (!option || typeof option !== 'object') return option;
+  const result = {};
+  for (const key of OPTION_KEYS) {
+    if (!(key in option)) continue;
+    const value = option[key];
+    if (key === 'choices' && Array.isArray(value)) result[key] = value.map(normalizeChoice);
+    else if (key === 'options' && Array.isArray(value)) result[key] = value.map(normalizeOption);
+    else if (key === 'channel_types' && Array.isArray(value)) result[key] = [...value].map(Number).sort((a, b) => a - b);
+    else result[key] = normalize(value, key);
   }
+  return sortObject(result);
+}
 
-  if (expected && typeof expected === 'object') {
-    if (!registered || typeof registered !== 'object' || Array.isArray(registered)) return false;
-    return Object.entries(expected).every(([key, value]) => matchesExpected(value, registered[key]));
+function sortObject(object) {
+  return Object.fromEntries(Object.entries(object).sort(([a], [b]) => a.localeCompare(b)));
+}
+
+function normalize(value, key = null) {
+  if (Array.isArray(value)) {
+    return value.map((item) => normalize(item)).filter((item) => item !== undefined);
   }
+  if (value && typeof value === 'object') {
+    if (key && OPTION_KEYS.has(key)) return normalizeOption(value);
+    const allowed = key === null ? COMMAND_KEYS : null;
+    const result = {};
+    for (const [childKey, childValue] of Object.entries(value)) {
+      if (allowed && !allowed.has(childKey)) continue;
+      if (childKey === 'options' && Array.isArray(childValue)) result[childKey] = childValue.map(normalizeOption);
+      else if (childKey === 'default_member_permissions') result[childKey] = normalizePrimitive(childValue, childKey);
+      else result[childKey] = normalize(childValue, childKey);
+    }
+    return sortObject(result);
+  }
+  return normalizePrimitive(value, key);
+}
 
-  return expected === registered;
+function commandMap(commands) {
+  return new Map((commands || []).map((command) => [command.name, normalize(command)]));
 }
 
 function commandsEqual(expected, registered) {
@@ -70,11 +118,35 @@ function commandsEqual(expected, registered) {
   const registeredMap = commandMap(registered);
   if (expectedMap.size !== registeredMap.size) return false;
 
-  for (const [name, command] of expectedMap) {
+  for (const [name, expectedCommand] of expectedMap) {
     if (!registeredMap.has(name)) return false;
-    if (!matchesExpected(command, registeredMap.get(name))) return false;
+    if (JSON.stringify(expectedCommand) !== JSON.stringify(registeredMap.get(name))) return false;
   }
   return true;
+}
+
+function commandDifferences(expected, registered) {
+  const differences = [];
+  const expectedMap = commandMap(expected);
+  const registeredMap = commandMap(registered);
+
+  for (const name of new Set([...expectedMap.keys(), ...registeredMap.keys()])) {
+    if (!expectedMap.has(name)) {
+      differences.push(`${name}: solo existe en Discord`);
+      continue;
+    }
+    if (!registeredMap.has(name)) {
+      differences.push(`${name}: solo existe en el código`);
+      continue;
+    }
+    const expectedJson = JSON.stringify(expectedMap.get(name), null, 2);
+    const registeredJson = JSON.stringify(registeredMap.get(name), null, 2);
+    if (expectedJson !== registeredJson) {
+      differences.push(`${name}: definición distinta`);
+    }
+  }
+
+  return differences;
 }
 
 function expectedForGuild(commands, guildType) {
@@ -143,6 +215,11 @@ async function syncGuildCommands(rest, guildType, guildId, commands) {
     return { changed: false, count: body.length };
   }
 
+  const differences = commandDifferences(body, registered || []);
+  if (differences.length) {
+    console.warn(`[HYPNOX][COMMANDS] ${guildType}: diferencias detectadas — ${differences.join(' | ')}`);
+  }
+
   const updated = await requestWithRetry(() => rest.put(route, { body }), `${guildType} PUT`);
   const count = Array.isArray(updated) ? updated.length : body.length;
   console.log(`[HYPNOX][COMMANDS] ${guildType}: comandos registrados (${count}).`);
@@ -169,4 +246,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { deploy, loadCommandData, expectedForGuild, commandsEqual, syncGuildCommands, validateDeployEnv };
+module.exports = { deploy, loadCommandData, expectedForGuild, commandsEqual, syncGuildCommands, validateDeployEnv, normalize, commandDifferences };
