@@ -2,7 +2,7 @@ require('dotenv').config();
 
 const { REST, Routes } = require('discord.js');
 const { getEnv, getGuildIds } = require('../src/config/env');
-const { loadCommandData, expectedForGuild, commandsEqual } = require('../src/deploy-commands');
+const { loadCommandData, expectedForGuild, commandsEqual, commandDifferences } = require('../src/deploy-commands');
 
 function validateDiscordRegistrationEnv() {
   const required = ['DISCORD_TOKEN', 'DISCORD_CLIENT_ID'];
@@ -38,16 +38,19 @@ async function verify() {
         Routes.applicationGuildCommands(getEnv('DISCORD_CLIENT_ID'), guildId)
       );
       const expected = expectedForGuild(commands, guildType);
+      const actual = Array.isArray(registered) ? registered : [];
 
-      if (!commandsEqual(expected, registered || [])) {
+      if (!commandsEqual(expected, actual)) {
         failed = true;
         const expectedNames = new Set(expected.map((command) => command.name));
-        const registeredNames = new Set((registered || []).map((command) => command.name));
+        const registeredNames = new Set(actual.map((command) => command.name));
         const missing = [...expectedNames].filter((name) => !registeredNames.has(name));
         const stale = [...registeredNames].filter((name) => !expectedNames.has(name));
-        console.error(`[HYPNOX][COMMANDS] ${guildType}: DESINCRONIZADO — faltan [${missing.join(', ')}] | sobran [${stale.join(', ')}] | esperados ${expected.length} | registrados ${registered.length}.`);
+        const differences = commandDifferences(expected, actual);
+        console.error(`[HYPNOX][COMMANDS] ${guildType}: DESINCRONIZADO — faltan [${missing.join(', ')}] | sobran [${stale.join(', ')}] | esperados ${expected.length} | registrados ${actual.length}.`);
+        if (differences.length) console.error(`[HYPNOX][COMMANDS] ${guildType}: diferencias — ${differences.join(' | ')}`);
       } else {
-        console.log(`[HYPNOX][COMMANDS] ${guildType}: OK — ${registered.length} comandos registrados.`);
+        console.log(`[HYPNOX][COMMANDS] ${guildType}: OK — ${actual.length} comandos registrados.`);
       }
     } catch (error) {
       failed = true;
