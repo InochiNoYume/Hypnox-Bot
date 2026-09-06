@@ -87,6 +87,28 @@ async function submitTicketRating({ ticketId, userId, rating, justification }) {
   return { ticket, rating: data };
 }
 
+function calculateStaffPerformanceScore({ claimed, resolved, ratings, average }) {
+  const claimedCount = Number(claimed) || 0;
+  const resolvedCount = Number(resolved) || 0;
+  const ratingsCount = Number(ratings) || 0;
+  const averageRating = Number(average) || 0;
+
+  const activityScore = Math.min(claimedCount / 25, 1) * 25;
+  const resolutionScore = claimedCount > 0 ? Math.min(resolvedCount / claimedCount, 1) * 30 : 0;
+  const qualityScore = averageRating > 0 ? (averageRating / 5) * 35 : 0;
+  const ratingVolumeScore = Math.min(ratingsCount / 10, 1) * 10;
+
+  return Math.round((activityScore + resolutionScore + qualityScore + ratingVolumeScore) * 100) / 100;
+}
+
+function getPerformanceLevel(score) {
+  if (score >= 90) return 'Excelente desempeño';
+  if (score >= 75) return 'Muy buen desempeño';
+  if (score >= 60) return 'Buen desempeño';
+  if (score >= 40) return 'En desarrollo';
+  return 'Desempeño insuficiente';
+}
+
 async function getStaffTicketHistory(guildId, staffDiscordUserId) {
   const [{ count: claimed, error: claimedError }, { count: resolved, error: resolvedError }, { data: ratings, error: ratingsError }] = await Promise.all([
     supabase.from('tickets').select('id', { count: 'exact', head: true }).eq('guild_id', guildId).eq('assigned_to_discord_user_id', staffDiscordUserId),
@@ -103,7 +125,25 @@ async function getStaffTicketHistory(guildId, staffDiscordUserId) {
   const distribution = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
   values.forEach((value) => { distribution[value] += 1; });
 
-  return { claimed: claimed || 0, resolved: resolved || 0, ratings: values.length, average, distribution, recentRatings: ratings || [] };
+  const score = calculateStaffPerformanceScore({ claimed, resolved, ratings: values.length, average });
+
+  return {
+    claimed: claimed || 0,
+    resolved: resolved || 0,
+    ratings: values.length,
+    average,
+    distribution,
+    score,
+    performanceLevel: getPerformanceLevel(score),
+    recentRatings: ratings || []
+  };
 }
 
-module.exports = { getTicketRating, requestTicketRating, submitTicketRating, getStaffTicketHistory };
+module.exports = {
+  getTicketRating,
+  requestTicketRating,
+  submitTicketRating,
+  getStaffTicketHistory,
+  calculateStaffPerformanceScore,
+  getPerformanceLevel
+};
