@@ -1,5 +1,15 @@
 const supabase = require('../database/supabase');
-const { getTicket, getTicketCreatorDiscordId } = require('./tickets');
+const { getTicketCreatorDiscordId } = require('./tickets');
+
+async function getTicketById(ticketId) {
+  const { data, error } = await supabase
+    .from('tickets')
+    .select('*')
+    .eq('id', ticketId)
+    .maybeSingle();
+  if (error) throw error;
+  return data;
+}
 
 async function getTicketRating(ticketId) {
   const { data, error } = await supabase
@@ -12,13 +22,13 @@ async function getTicketRating(ticketId) {
 }
 
 async function requestTicketRating(ticketId, staffDiscordUserId) {
-  const ticket = await getTicket(ticketId);
+  const ticket = await getTicketById(ticketId);
   if (!ticket) throw new Error('TICKET_NOT_FOUND');
   if (!ticket.assigned_to_discord_user_id) throw new Error('TICKET_NOT_ASSIGNED');
   if (ticket.assigned_to_discord_user_id !== staffDiscordUserId) throw new Error('TICKET_NOT_ASSIGNED_TO_YOU');
 
   const existing = await getTicketRating(ticket.id);
-  if (existing) throw new Error('TICKET_ALREADY_RATED');
+  if (existing) throw new Error(existing.rating !== null ? 'TICKET_ALREADY_RATED' : 'RATING_ALREADY_REQUESTED');
 
   const creatorDiscordUserId = await getTicketCreatorDiscordId(ticket);
   if (!creatorDiscordUserId) throw new Error('TICKET_CREATOR_NOT_FOUND');
@@ -29,31 +39,30 @@ async function requestTicketRating(ticketId, staffDiscordUserId) {
       ticket_id: ticket.id,
       guild_id: ticket.guild_id,
       staff_discord_user_id: staffDiscordUserId,
-      rated_by_discord_user_id: creatorDiscordUserId
+      rated_by_discord_user_id: creatorDiscordUserId,
+      rating: null,
+      justification: null,
+      submitted_at: null
     })
     .select()
     .single();
   if (error) {
-    if (error.code === '23505') throw new Error('TICKET_ALREADY_RATED');
+    if (error.code === '23505') throw new Error('RATING_ALREADY_REQUESTED');
     throw error;
   }
   return { ticket, rating: data, creatorDiscordUserId };
 }
 
 async function submitTicketRating({ ticketId, userId, rating, justification }) {
-  const ticket = await getTicket(ticketId);
+  const ticket = await getTicketById(ticketId);
   if (!ticket) throw new Error('TICKET_NOT_FOUND');
   if (!ticket.assigned_to_discord_user_id) throw new Error('TICKET_NOT_ASSIGNED');
 
   const numericRating = Number(rating);
-  if (!Number.isInteger(numericRating) || numericRating < 1 || numericRating > 5) {
-    throw new Error('INVALID_RATING');
-  }
+  if (!Number.isInteger(numericRating) || numericRating < 1 || numericRating > 5) throw new Error('INVALID_RATING');
 
   const cleanJustification = String(justification || '').trim();
-  if (cleanJustification.length < 5 || cleanJustification.length > 2000) {
-    throw new Error('INVALID_JUSTIFICATION');
-  }
+  if (cleanJustification.length < 5 || cleanJustification.length > 2000) throw new Error('INVALID_JUSTIFICATION');
 
   const pending = await supabase
     .from('ticket_ratings')
@@ -94,19 +103,7 @@ async function getStaffTicketHistory(guildId, staffDiscordUserId) {
   const distribution = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
   values.forEach((value) => { distribution[value] += 1; });
 
-  return {
-    claimed: claimed || 0,
-    resolved: resolved || 0,
-    ratings: values.length,
-    average,
-    distribution,
-    recentRatings: ratings || []
-  };
+  return { claimed: claimed || 0, resolved: resolved || 0, ratings: values.length, average, distribution, recentRatings: ratings || [] };
 }
 
-module.exports = {
-  getTicketRating,
-  requestTicketRating,
-  submitTicketRating,
-  getStaffTicketHistory
-};
+module.exports = { getTicketRating, requestTicketRating, submitTicketRating, getStaffTicketHistory };
