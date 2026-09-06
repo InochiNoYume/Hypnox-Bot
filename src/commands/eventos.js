@@ -36,8 +36,9 @@ const data = new SlashCommandBuilder()
     .addStringOption((option) => option.setName('id').setDescription('ID del evento.').setRequired(true)));
 
 async function execute(interaction) {
+  await interaction.deferReply({ flags: EPHEMERAL });
   const guild = await getGuildRow(interaction.guild.id);
-  if (!guild) return interaction.reply({ content: 'Servidor no registrado.', flags: EPHEMERAL });
+  if (!guild) return interaction.editReply({ content: 'Servidor no registrado.' });
 
   try {
     const sub = interaction.options.getSubcommand();
@@ -45,9 +46,9 @@ async function execute(interaction) {
       const start = new Date(interaction.options.getString('inicio'));
       const endText = interaction.options.getString('fin');
       const end = endText ? new Date(endText) : null;
-      if (Number.isNaN(start.getTime()) || (end && Number.isNaN(end.getTime()))) return interaction.reply({ content: 'Fecha ISO inválida.', flags: EPHEMERAL });
-      if (end && end <= start) return interaction.reply({ content: 'La fecha de finalización debe ser posterior a la fecha de inicio.', flags: EPHEMERAL });
-      if (start <= new Date()) return interaction.reply({ content: 'La fecha de inicio debe ser futura.', flags: EPHEMERAL });
+      if (Number.isNaN(start.getTime()) || (end && Number.isNaN(end.getTime()))) return interaction.editReply({ content: 'Fecha ISO inválida.' });
+      if (end && end <= start) return interaction.editReply({ content: 'La fecha de finalización debe ser posterior a la fecha de inicio.' });
+      if (start <= new Date()) return interaction.editReply({ content: 'La fecha de inicio debe ser futura.' });
 
       const { data: event, error } = await supabase.from('events').insert({
         guild_id: guild.id, channel_id: interaction.channel.id,
@@ -70,34 +71,34 @@ async function execute(interaction) {
       const { error: messageError } = await supabase.from('events').update({ message_id: message.id }).eq('id', event.id);
       if (messageError) throw messageError;
       await writeLog({ guild: interaction.guild, category: 'event', action: 'create', actorId: interaction.user.id, channelId: interaction.channel.id, message: event.title, metadata: { eventId: event.id } });
-      return interaction.reply({ content: `Evento creado: \`${event.id}\``, flags: EPHEMERAL });
+      return interaction.editReply({ content: `Evento creado: \`${event.id}\`` });
     }
 
     const id = interaction.options.getString('id');
     const { data: current, error: currentError } = await supabase.from('events').select('*').eq('id', id).eq('guild_id', guild.id).maybeSingle();
     if (currentError) throw currentError;
-    if (!current) return interaction.reply({ content: 'No se encontró el evento indicado.', flags: EPHEMERAL });
-    if (['cancelar','iniciar','finalizar'].includes(sub) && current.status === 'finished') return interaction.reply({ content: 'Este evento ya está finalizado.', flags: EPHEMERAL });
-    if (sub === 'cancelar' && current.status === 'cancelled') return interaction.reply({ content: 'Este evento ya está cancelado.', flags: EPHEMERAL });
-    if (sub === 'iniciar' && current.status !== 'upcoming') return interaction.reply({ content: 'Solo puedes iniciar un evento programado.', flags: EPHEMERAL });
-    if (sub === 'finalizar' && current.status !== 'active') return interaction.reply({ content: 'Solo puedes finalizar un evento activo.', flags: EPHEMERAL });
+    if (!current) return interaction.editReply({ content: 'No se encontró el evento indicado.' });
+    if (['cancelar','iniciar','finalizar'].includes(sub) && current.status === 'finished') return interaction.editReply({ content: 'Este evento ya está finalizado.' });
+    if (sub === 'cancelar' && current.status === 'cancelled') return interaction.editReply({ content: 'Este evento ya está cancelado.' });
+    if (sub === 'iniciar' && current.status !== 'upcoming') return interaction.editReply({ content: 'Solo puedes iniciar un evento programado.' });
+    if (sub === 'finalizar' && current.status !== 'active') return interaction.editReply({ content: 'Solo puedes finalizar un evento activo.' });
 
     const patch = { updated_at: new Date().toISOString() };
     if (sub === 'editar') {
-      if (!['upcoming','active'].includes(current.status)) return interaction.reply({ content: 'Solo puedes editar un evento programado o activo.', flags: EPHEMERAL });
+      if (!['upcoming','active'].includes(current.status)) return interaction.editReply({ content: 'Solo puedes editar un evento programado o activo.' });
       const title = interaction.options.getString('titulo');
       const description = interaction.options.getString('descripcion');
       const startText = interaction.options.getString('inicio');
       const endText = interaction.options.getString('fin');
-      if (!title && !description && !startText && !endText) return interaction.reply({ content: 'Debes indicar al menos un campo para actualizar.', flags: EPHEMERAL });
+      if (!title && !description && !startText && !endText) return interaction.editReply({ content: 'Debes indicar al menos un campo para actualizar.' });
       if (title) patch.title = title.trim();
       if (description) patch.description = description.trim();
       const start = startText ? new Date(startText) : new Date(current.starts_at);
       const end = endText ? new Date(endText) : (current.ends_at ? new Date(current.ends_at) : null);
-      if (startText && Number.isNaN(start.getTime())) return interaction.reply({ content: 'Fecha de inicio ISO inválida.', flags: EPHEMERAL });
-      if (endText && Number.isNaN(end.getTime())) return interaction.reply({ content: 'Fecha de finalización ISO inválida.', flags: EPHEMERAL });
-      if (startText && start <= new Date()) return interaction.reply({ content: 'La fecha de inicio debe ser futura.', flags: EPHEMERAL });
-      if (end && end <= start) return interaction.reply({ content: 'La fecha de finalización debe ser posterior a la fecha de inicio.', flags: EPHEMERAL });
+      if (startText && Number.isNaN(start.getTime())) return interaction.editReply({ content: 'Fecha de inicio ISO inválida.' });
+      if (endText && Number.isNaN(end.getTime())) return interaction.editReply({ content: 'Fecha de finalización ISO inválida.' });
+      if (startText && start <= new Date()) return interaction.editReply({ content: 'La fecha de inicio debe ser futura.' });
+      if (end && end <= start) return interaction.editReply({ content: 'La fecha de finalización debe ser posterior a la fecha de inicio.' });
       if (startText) patch.starts_at = start.toISOString();
       if (endText) patch.ends_at = end?.toISOString() || null;
     } else {
@@ -107,10 +108,10 @@ async function execute(interaction) {
     const { data: updated, error } = await supabase.from('events').update(patch).eq('id', id).eq('guild_id', guild.id).select().single();
     if (error) throw error;
     await writeLog({ guild: interaction.guild, category: 'event', action: sub, actorId: interaction.user.id, channelId: interaction.channel.id, message: id, metadata: { previousStatus: current.status, newStatus: updated.status } });
-    return interaction.reply({ content: `Evento actualizado: ${updated.title}.`, flags: EPHEMERAL });
+    return interaction.editReply({ content: `Evento actualizado: ${updated.title}.` });
   } catch (error) {
     console.error('[HYPNOX] Event error:', error);
-    return interaction.reply({ content: 'No se pudo gestionar el evento.', flags: EPHEMERAL }).catch(() => {});
+    return interaction.editReply({ content: 'No se pudo gestionar el evento.' }).catch(() => {});
   }
 }
 
