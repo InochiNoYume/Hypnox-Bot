@@ -8,6 +8,7 @@
     "dev": "node --watch src/index.js",
     "deploy": "node src/deploy-commands.js",
     "validate": "node scripts/validate-modules.js",
+    "verify:supabase": "node scripts/verify-supabase.js",
     "verify:discord": "node scripts/verify-command-registration.js"
   },
   "engines": {
