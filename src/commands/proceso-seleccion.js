@@ -13,28 +13,35 @@ module.exports = {
 
   async execute(interaction) {
     if (!isAdmin(interaction.member)) return interaction.reply({ content: 'No tienes permisos para publicar el proceso de selección.', flags: EPHEMERAL });
-    const channelId = getEnv('APPLICATIONS_CHANNEL_SELECTION_ID');
-    const channel = channelId ? await interaction.guild.channels.fetch(channelId).catch(() => null) : null;
-    if (!channel?.isTextBased()) return interaction.reply({ content: 'Configura APPLICATIONS_CHANNEL_SELECTION_ID en el entorno del bot.', flags: EPHEMERAL });
+    await interaction.deferReply({ flags: EPHEMERAL });
 
-    const embed = brandedEmbed('PROCESO DE SELECCIÓN', 'Proceso oficial de incorporación al equipo de Hypnox Studios. La evaluación busca identificar a las personas que mejor se adapten a las necesidades, responsabilidades y valores actuales del proyecto.', {
-      footerText: 'Hypnox Studios • Staff Applications • Selección'
-    });
+    try {
+      const channelId = getEnv('APPLICATIONS_CHANNEL_SELECTION_ID');
+      const channel = channelId ? await interaction.guild.channels.fetch(channelId).catch(() => null) : null;
+      if (!channel?.isTextBased()) return interaction.editReply({ content: 'Configura APPLICATIONS_CHANNEL_SELECTION_ID en el entorno del bot.' });
 
-    embed.addFields(
-      { name: '『01』 CONVOCATORIA', value: 'Las postulaciones se habilitan mediante un anuncio oficial. Solo se consideran las postulaciones enviadas durante el periodo indicado.' },
-      { name: '『02』 POSTULACIÓN', value: 'Accede al servidor de Staff Applications mediante el enlace oficial y sigue las instrucciones publicadas.' },
-      { name: '『03』 REVISIÓN', value: 'El equipo responsable revisa la información proporcionada y comprueba que la postulación cumpla los requisitos establecidos.' },
-      { name: '『04』 EVALUACIÓN', value: 'Se valoran responsabilidad, actividad, comunicación, madurez, experiencia, disposición para colaborar y adecuación al puesto solicitado.' },
-      { name: '『05』 DECISIÓN', value: 'La decisión final corresponde al equipo autorizado. Cumplir los requisitos no garantiza la aceptación.' },
-      { name: '『06』 RESULTADO', value: 'Los resultados se comunican mediante los canales oficiales. Una persona puede ser aceptada, rechazada o quedar fuera según las necesidades del momento.' },
-      { name: '『07』 INCORPORACIÓN', value: 'Las personas aceptadas recibirán las indicaciones necesarias para incorporarse y, cuando corresponda, comenzar su formación o evaluación.' },
-      { name: '『08』 CONFIDENCIALIDAD', value: 'La información utilizada durante la revisión debe tratarse de forma responsable. No compartas conversaciones, decisiones internas ni datos de otros candidatos.' },
-      { name: '『09』 IMPORTANTE', value: 'Hypnox Studios puede modificar requisitos, puestos, etapas o fechas según las necesidades de cada proyecto.' }
-    );
+      const embed = brandedEmbed('PROCESO DE SELECCIÓN', 'Proceso oficial de incorporación al equipo de Hypnox Studios. La evaluación busca identificar a las personas que mejor se adapten a las necesidades, responsabilidades y valores actuales del proyecto.', {
+        footerText: 'Hypnox Studios • Staff Applications • Selección'
+      });
 
-    await channel.send({ embeds: [embed] });
-    return interaction.reply({ content: `Proceso de selección publicado en <#${channel.id}>.`, flags: EPHEMERAL });
+      embed.addFields(
+        { name: '『01』 CONVOCATORIA', value: 'Las postulaciones se habilitan mediante un anuncio oficial. Solo se consideran las postulaciones enviadas durante el periodo indicado.' },
+        { name: '『02』 POSTULACIÓN', value: 'Accede al servidor de Staff Applications mediante el enlace oficial y sigue las instrucciones publicadas.' },
+        { name: '『03』 REVISIÓN', value: 'El equipo responsable revisa la información proporcionada y comprueba que la postulación cumpla los requisitos establecidos.' },
+        { name: '『04』 EVALUACIÓN', value: 'Se valoran responsabilidad, actividad, comunicación, madurez, experiencia, disposición para colaborar y adecuación al puesto solicitado.' },
+        { name: '『05』 DECISIÓN', value: 'La decisión final corresponde al equipo autorizado. Cumplir los requisitos no garantiza la aceptación.' },
+        { name: '『06』 RESULTADO', value: 'Los resultados se comunican mediante los canales oficiales. Una persona puede ser aceptada, rechazada o quedar fuera según las necesidades del momento.' },
+        { name: '『07』 INCORPORACIÓN', value: 'Las personas aceptadas recibirán las indicaciones necesarias para incorporarse y, cuando corresponda, comenzar su formación o evaluación.' },
+        { name: '『08』 CONFIDENCIALIDAD', value: 'La información utilizada durante la revisión debe tratarse de forma responsable. No compartas conversaciones, decisiones internas ni datos de otros candidatos.' },
+        { name: '『09』 IMPORTANTE', value: 'Hypnox Studios puede modificar requisitos, puestos, etapas o fechas según las necesidades de cada proyecto.' }
+      );
+
+      await channel.send({ embeds: [embed] });
+      return interaction.editReply({ content: `Proceso de selección publicado en <#${channel.id}>.` });
+    } catch (error) {
+      console.error('[HYPNOX] Proceso de selección error:', error);
+      return interaction.editReply({ content: 'No se pudo publicar el proceso de selección. El error fue registrado para revisión.' }).catch(() => {});
+    }
   },
 
   guilds: ['applications']
