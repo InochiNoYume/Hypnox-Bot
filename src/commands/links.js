@@ -11,13 +11,20 @@ function readUrl(key) {
   return /^https?:\/\//i.test(url) ? url : `https://${url}`;
 }
 
+function readEmail(key) {
+  const value = getEnv(key);
+  if (!value) return null;
+  const email = String(value).trim();
+  return email || null;
+}
+
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('links')
     .setDescription('Muestra los enlaces oficiales de Hypnox Studios.'),
 
   async execute(interaction) {
-    const links = [
+    const officialLinks = [
       ['Discord', readUrl('OFFICIAL_DISCORD_URL')],
       ['Web', readUrl('WEBSITE_URL')],
       ['YouTube', readUrl('YOUTUBE_URL')],
@@ -25,28 +32,63 @@ module.exports = {
       ['Instagram', readUrl('INSTAGRAM_URL')]
     ].filter(([, url]) => url);
 
+    const supportLinks = [
+      ['PayPal', readUrl('OFFICIAL_PAYPAL_URL')],
+      ['Ko-fi', readUrl('OFFICIAL_KOFI_URL')]
+    ].filter(([, url]) => url);
+
+    const contactEmail = readEmail('OFFICIAL_CONTACT_EMAIL');
+    const allLinks = [...officialLinks, ...supportLinks];
+
     const embed = brandedEmbed('ENLACES OFICIALES',
-      'Accede a los espacios oficiales de **Hypnox Studios** y encuentra nuestras comunidades, contenido y proyectos.',
+      'Accede a los espacios oficiales de **Hypnox Studios**, apoya nuestro trabajo o ponte en contacto con nosotros.',
       { footerText: 'Hypnox Studios • Canales oficiales' }
     );
 
-    if (!links.length) {
+    if (officialLinks.length) {
+      addSection(
+        embed,
+        'Nuestros espacios',
+        officialLinks.map(([name, url]) => `**${name}**\n${url}`).join('\n\n')
+      );
+    }
+
+    if (supportLinks.length) {
+      addSection(
+        embed,
+        'Apoya el proyecto',
+        supportLinks.map(([name, url]) => {
+          const description = name === 'PayPal'
+            ? 'Apoya el desarrollo y mantenimiento de Hypnox Studios.'
+            : 'Apoya nuestro trabajo y ayúdanos a seguir creando nuevos proyectos.';
+          return `**${name}** — ${description}\n${url}`;
+        }).join('\n\n')
+      );
+    }
+
+    if (contactEmail) {
+      addSection(embed, 'Contacto', `**Correo oficial**\n${contactEmail}`);
+    }
+
+    if (!allLinks.length && !contactEmail) {
       addSection(embed, 'Estado', 'No se encontraron enlaces oficiales configurados en el entorno del bot.');
       return interaction.reply({ embeds: [embed] });
     }
 
-    addSection(
-      embed,
-      'Nuestros espacios',
-      links.map(([name, url]) => `**${name}**\n${url}`).join('\n\n')
-    );
-
-    const buttons = links.slice(0, 5).map(([name, url]) =>
-      new ButtonBuilder()
-        .setLabel(name)
-        .setStyle(ButtonStyle.Link)
-        .setURL(url)
-    );
+    const buttons = [
+      ...allLinks.map(([name, url]) =>
+        new ButtonBuilder()
+          .setLabel(name)
+          .setStyle(ButtonStyle.Link)
+          .setURL(url)
+      ),
+      ...(contactEmail ? [
+        new ButtonBuilder()
+          .setLabel('Contacto')
+          .setStyle(ButtonStyle.Link)
+          .setURL(`https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(contactEmail)}`)
+      ] : [])
+    ];
 
     const components = [];
     for (let index = 0; index < buttons.length; index += 5) {
