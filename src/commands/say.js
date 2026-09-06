@@ -20,16 +20,28 @@ async function execute(interaction) {
   const message = interaction.options.getString('mensaje', true).trim();
   if (!message) return interaction.reply({ content: 'Debes indicar un mensaje.', flags: EPHEMERAL });
 
-  await interaction.channel.send({ content: message, allowedMentions: { parse: [] } });
-
-  if (interaction.message) {
-    await interaction.message.delete().catch(() => {});
-    return;
+  if (interaction.isChatInputCommand?.()) {
+    await interaction.deferReply({ flags: EPHEMERAL });
   }
 
-  if (interaction.isChatInputCommand?.()) {
-    await interaction.reply({ content: 'Mensaje publicado.', flags: EPHEMERAL });
-    setTimeout(() => interaction.deleteReply().catch(() => {}), 1200);
+  try {
+    await interaction.channel.send({ content: message, allowedMentions: { parse: [] } });
+
+    if (interaction.message) {
+      await interaction.message.delete().catch(() => {});
+      return;
+    }
+
+    if (interaction.isChatInputCommand?.()) {
+      await interaction.editReply({ content: 'Mensaje publicado.' });
+      setTimeout(() => interaction.deleteReply().catch(() => {}), 1200);
+    }
+  } catch (error) {
+    console.error('[HYPNOX][SAY] Error publicando mensaje:', error);
+    if (interaction.deferred || interaction.replied) {
+      return interaction.editReply({ content: 'No se pudo publicar el mensaje. El error fue registrado para revisión.' }).catch(() => {});
+    }
+    return interaction.reply({ content: 'No se pudo publicar el mensaje. El error fue registrado para revisión.', flags: EPHEMERAL }).catch(() => {});
   }
 }
 
