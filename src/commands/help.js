@@ -20,13 +20,13 @@ const COMMANDS = {
   informacion: ['/info', '/reglas', '/roles', '/links'],
   comunidad: ['/user', '/serverinfo', '/credits'],
   moderacion: ['/moderacion warn', '/moderacion warnings', '/moderacion unwarn', '/moderacion timeout', '/moderacion clear', '/moderacion slowmode', '/moderacion kick', '/moderacion ban'],
-  tickets: ['/tickets panel', '/tickets cerrar', '/tickets claim', '/tickets add', '/tickets remove'],
+  tickets: ['/tickets panel', '/tickets cerrar', '/tickets claim', '/tickets valorar', '/tickets historial', '/tickets add', '/tickets remove'],
   anuncios: ['/anuncio', '/anuncio-programado crear', '/anuncio-programado lista', '/anuncio-programado cancelar'],
   eventos: ['/evento crear', '/evento editar', '/evento cancelar', '/evento iniciar', '/evento finalizar', '/evento-participar unirse', '/evento-participar salir', '/evento-participantes'],
   premios: ['/premio crear', '/premio finalizar', '/premio reroll', '/premio entregar'],
-  postulaciones: ['/abierto', '/cerrado', '/aceptado', '/requisitos', '/informacion', '/postular', '/resultado', '/estado-postulacion', '/reglamento-interno'],
+  postulaciones: ['/abierto', '/cerrado', '/aceptado', '/requisitos', '/informacion', '/postular', '/resultado', '/estado-postulacion', '/reglamento-interno', '/faq-postulaciones', '/proceso-seleccion'],
   proyectos: ['/proyecto crear', '/proyecto editar', '/proyecto estado', '/proyecto cerrar', '/proyecto asignar'],
-  administracion: ['/administracion config', '/administracion set-channel', '/administracion set-role', '/administracion set-permission', '/administracion maintenance', '/administracion reload', '/auditoria usuario', '/status', '/reportes lista', '/reportes ver', '/reportes resolver', '/reportes rechazar', '/encuesta crear', '/encuesta cerrar']
+  administracion: ['/administracion config', '/administracion set-channel', '/administracion set-role', '/administracion set-permission', '/administracion maintenance', '/administracion reload', '/auditoria usuario', '/status', '/reportes lista', '/reportes ver', '/reportes resolver', '/reportes rechazar', '/encuesta crear', '/encuesta cerrar', '/prefijo establecer', '/prefijo ver', '/prefijo restablecer', '/say']
 };
 
 const data = new SlashCommandBuilder()
@@ -56,7 +56,7 @@ async function execute(interaction) {
   if (!category || !category.guilds.includes(type) || !canViewHelpCategory(interaction.member, sub)) return interaction.reply({ content: 'Esta categoría no está disponible para tu rol.', flags: MessageFlags.Ephemeral });
   let commands = COMMANDS[sub] || [];
   if (sub === 'postulaciones' && type === 'official') commands = ['/abierto', '/cerrado', '/aceptado'];
-  if (sub === 'postulaciones' && type === 'applications') commands = ['/requisitos', '/informacion', '/postular', '/resultado', '/estado-postulacion'];
+  if (sub === 'postulaciones' && type === 'applications') commands = ['/requisitos', '/informacion', '/postular', '/resultado', '/estado-postulacion', '/proceso-seleccion', '/faq-postulaciones'];
   if (sub === 'eventos') commands = type === 'official' ? COMMANDS.eventos : ['/evento crear', '/evento editar', '/evento cancelar', '/evento iniciar', '/evento finalizar'];
   if (sub === 'anuncios' && type === 'staff') commands = ['/anuncio', '/anuncio-programado crear', '/anuncio-programado lista', '/anuncio-programado cancelar'];
   if (sub === 'administracion' && type === 'applications') commands = ['/administracion config', '/administracion set-channel', '/administracion set-role', '/administracion set-permission', '/administracion maintenance', '/administracion reload'];
