@@ -7,10 +7,11 @@ const TICKET_TYPE_DB = {
   reporte: 'report',
   alianza: 'alliance_partner',
   contacto: 'contact',
-  bugs: 'bugs'
+  bugs: 'bugs',
+  boost: 'boost'
 };
 
-const VALID_TICKET_TYPES = ['support', 'report', 'alliance_partner', 'contact', 'bugs'];
+const VALID_TICKET_TYPES = ['support', 'report', 'alliance_partner', 'contact', 'bugs', 'boost'];
 
 function normalizeTicketType(type) {
   const normalized = TICKET_TYPE_DB[type] || type;
