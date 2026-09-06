@@ -16,7 +16,7 @@ El bot utiliza una única aplicación de Discord y una única base de datos de S
 - Los servidores, roles y canales se identifican mediante IDs configurados en `.env`.
 - Las respuestas y embeds utilizan una identidad visual negra (`#000000`) y no dependen de nombres de roles.
 - Los registros se almacenan en Supabase y cada servidor utiliza un único canal de logs configurado.
-- `DISCORD_TOKEN` y `SUPABASE_SERVICE_ROLE_KEY` nunca deben publicarse.
+- `DISCORD_TOKEN` y las claves secretas de Supabase nunca deben publicarse.
 - No existe una aplicación web dependiente del bot.
 
 ## Comandos
@@ -26,7 +26,7 @@ Hypnox admite **dos formas de uso**:
 - **Slash commands:** `/comando` y `/comando subcomando`.
 - **Comandos de prefijo:** `!comando` y `!comando-subcomando`.
 
-El prefijo predeterminado es `!` y puede configurarse por servidor mediante el sistema de prefijos. Para los comandos con subcomandos se recomienda utilizar siempre la forma con guiones para evitar ambigüedades.
+El prefijo predeterminado es `!` y puede configurarse por servidor mediante `/prefijo`. Para los comandos con subcomandos se recomienda utilizar siempre la forma con guiones en el sistema de prefijo.
 
 ### Ejemplos
 
@@ -58,122 +58,152 @@ El parser de prefijo distingue el comando base y el subcomando incluso cuando el
 ### Información
 
 ```text
-/ help inicio          → /help inicio
-!help-inicio           → panel general
-/info                   → !info
-/reglas                 → !reglas
-/roles                  → !roles
-/links                  → !links
+/help inicio             → !help-inicio
+/info                    → !info
+/reglas                  → !reglas
+/roles                   → !roles
+/links                   → !links
 ```
 
 ### Comunidad
 
 ```text
-/user                   → !user
-/serverinfo             → !serverinfo
-/credits                → !credits
+/user                    → !user
+/serverinfo              → !serverinfo
+/credits                 → !credits
 ```
 
 ### Moderación
 
 ```text
-/moderacion warn       → !moderacion-warn
-/moderacion warnings   → !moderacion-warnings
-/moderacion unwarn     → !moderacion-unwarn
-/moderacion timeout    → !moderacion-timeout
-/moderacion clear      → !moderacion-clear
-/moderacion slowmode   → !moderacion-slowmode
-/moderacion kick       → !moderacion-kick
-/moderacion ban        → !moderacion-ban
+/moderacion warn         → !moderacion-warn
+/moderacion warnings     → !moderacion-warnings
+/moderacion unwarn       → !moderacion-unwarn
+/moderacion timeout      → !moderacion-timeout
+/moderacion clear        → !moderacion-clear
+/moderacion slowmode     → !moderacion-slowmode
+/moderacion kick         → !moderacion-kick
+/moderacion ban          → !moderacion-ban
 ```
 
 ### Tickets
 
 ```text
-/tickets panel         → !tickets-panel
-/tickets cerrar        → !tickets-cerrar
-/tickets claim         → !tickets-claim
-/tickets add           → !tickets-add
-/tickets remove        → !tickets-remove
+/tickets panel           → !tickets-panel
+/tickets cerrar          → !tickets-cerrar
+/tickets claim           → !tickets-claim
+/tickets valorar         → !tickets-valorar
+/tickets historial       → !tickets-historial
+/tickets add             → !tickets-add
+/tickets remove          → !tickets-remove
 ```
 
-El panel de tickets incluye Soporte, Reporte, Alianza / Partner, Contacto, Bugs / Errores y Reclamar Beneficios Boost cuando el rol de Boost está configurado.
+El panel de tickets incluye Soporte, Reporte, Alianza / Partner, Contacto, Bugs / Errores y Reclamar Beneficios Boost cuando el rol Boost está configurado.
+
+La valoración de tickets se registra en `ticket_ratings` y `/tickets historial` permite consultar el desempeño histórico del Staff según tickets reclamados, resueltos y valoraciones recibidas.
 
 ### Anuncios
 
 ```text
-/anuncio               → !anuncio
-/anuncio-programado crear    → !anuncio-programado-crear
-/anuncio-programado lista    → !anuncio-programado-lista
-/anuncio-programado cancelar → !anuncio-programado-cancelar
+/anuncio                       → !anuncio
+/anuncio-programado crear     → !anuncio-programado-crear
+/anuncio-programado lista     → !anuncio-programado-lista
+/anuncio-programado cancelar  → !anuncio-programado-cancelar
 ```
 
 ### Eventos
 
 ```text
-/evento crear          → !evento-crear
-/evento editar         → !evento-editar
-/evento cancelar       → !evento-cancelar
-/evento iniciar        → !evento-iniciar
-/evento finalizar      → !evento-finalizar
+/evento crear                 → !evento-crear
+/evento editar                → !evento-editar
+/evento cancelar              → !evento-cancelar
+/evento iniciar               → !evento-iniciar
+/evento finalizar             → !evento-finalizar
 /evento-participar unirse     → !evento-participar-unirse
 /evento-participar salir      → !evento-participar-salir
-/evento-participantes  → !evento-participantes
+/evento-participantes         → !evento-participantes
+/comienza                     → !comienza
 ```
 
 ### Premios
 
 ```text
-/premio crear          → !premio-crear
-/premio finalizar      → !premio-finalizar
-/premio reroll         → !premio-reroll
-/premio entregar       → !premio-entregar
+/premio crear                 → !premio-crear
+/premio finalizar             → !premio-finalizar
+/premio reroll                → !premio-reroll
+/premio entregar              → !premio-entregar
 ```
 
 ### Postulaciones
 
 ```text
-/abierto               → !abierto
-/cerrado               → !cerrado
-/aceptado @usuario     → !aceptado @usuario
-/requisitos            → !requisitos
-/informacion           → !informacion
-/postular              → !postular
-/resultado @usuario    → !resultado @usuario
-/estado-postulacion    → !estado-postulacion
-/reglamento-interno    → !reglamento-interno
+/abierto                      → !abierto
+/cerrado                      → !cerrado
+/aceptado @usuario            → !aceptado @usuario
+/requisitos                   → !requisitos
+/informacion                  → !informacion
+/postular                     → !postular
+/resultado <resultado>        → !resultado <resultado>
+/estado-postulacion           → !estado-postulacion
+/proceso-seleccion            → !proceso-seleccion
+/faq-postulaciones            → !faq-postulaciones
+/reglamento-interno           → !reglamento-interno
 ```
 
 ### Proyectos
 
 ```text
-/proyecto crear        → !proyecto-crear
-/proyecto editar       → !proyecto-editar
-/proyecto estado       → !proyecto-estado
-/proyecto cerrar       → !proyecto-cerrar
-/proyecto asignar      → !proyecto-asignar
+/proyecto crear               → !proyecto-crear
+/proyecto editar              → !proyecto-editar
+/proyecto estado              → !proyecto-estado
+/proyecto cerrar              → !proyecto-cerrar
+/proyecto asignar             → !proyecto-asignar
 ```
 
 ### Administración
 
 ```text
-/administracion config          → !administracion-config
-/administracion set-channel     → !administracion-set-channel
-/administracion set-role        → !administracion-set-role
-/administracion set-permission  → !administracion-set-permission
-/administracion maintenance     → !administracion-maintenance
-/administracion reload          → !administracion-reload
-/auditoria usuario              → !auditoria-usuario
-/status                         → !status
-/reportes lista                 → !reportes-lista
-/reportes ver                   → !reportes-ver
-/reportes resolver              → !reportes-resolver
-/reportes rechazar              → !reportes-rechazar
-/encuesta crear                 → !encuesta-crear
-/encuesta cerrar                → !encuesta-cerrar
+/administracion config         → !administracion-config
+/administracion set-channel    → !administracion-set-channel
+/administracion set-role       → !administracion-set-role
+/administracion set-permission → !administracion-set-permission
+/administracion maintenance    → !administracion-maintenance
+/administracion reload        → !administracion-reload
+/auditoria usuario             → !auditoria-usuario
+/status                        → !status
+/reportes lista                → !reportes-lista
+/reportes ver                  → !reportes-ver
+/reportes resolver             → !reportes-resolver
+/reportes rechazar             → !reportes-rechazar
+/encuesta crear                → !encuesta-crear
+/encuesta cerrar               → !encuesta-cerrar
+/prefijo establecer            → !prefijo-establecer
+/prefijo ver                   → !prefijo-ver
+/prefijo restablecer           → !prefijo-restablecer
+/say <mensaje>                 → !say <mensaje>
 ```
 
 Los comandos disponibles dependen del servidor y de los permisos o roles configurados. `/help` y `!help` muestran el centro de ayuda correspondiente.
+
+## Respuestas de interacciones
+
+Discord exige que una interacción sea reconocida dentro de su ventana inicial. Por ello, los comandos que realizan operaciones de Supabase, consultas de canales/roles, creación de tickets, publicaciones o tareas potencialmente lentas deben reconocer primero la interacción mediante `deferReply` y continuar con `editReply`.
+
+El flujo de eventos también dispone de un manejador central de errores que responde o utiliza `followUp` cuando la interacción ya fue reconocida. Esto evita que un error interno termine silenciosamente en una interacción sin respuesta.
+
+Se corrigieron especialmente los comandos de publicación de postulaciones y contenido que realizaban consultas a Discord antes de responder, incluyendo:
+
+- `/abierto`
+- `/cerrado`
+- `/aceptado`
+- `/resultado`
+- `/faq`
+- `/faq-postulaciones`
+- `/proceso-seleccion`
+- `/prefijo`
+- `/say`
+
+Esto reduce el riesgo de mostrar **“La aplicación no respondió”** cuando Discord o Supabase tardan más de lo esperado.
 
 ## Autoroles
 
@@ -196,7 +226,7 @@ El flujo actual es deliberadamente simple:
 4. `/cerrado` cierra la convocatoria.
 5. `/aceptado @usuario1 ...` publica oficialmente a los usuarios aceptados.
 
-No se utilizan formularios, entrevistas ni tickets para este proceso. La documentación del proceso se publica mediante `/faq-postulaciones` y `/proceso-seleccion` en el servidor de Applications.
+En Staff Applications, `/requisitos`, `/informacion`, `/postular`, `/estado-postulacion`, `/resultado`, `/proceso-seleccion` y `/faq-postulaciones` documentan y gestionan el flujo correspondiente.
 
 ## Tickets
 
@@ -223,6 +253,14 @@ La categoría **Bugs / Errores** registra específicamente los fallos técnicos 
 
 Cada ticket dispone de un botón **Asistencia Oral** para el Staff autorizado. Al utilizarlo se crea un canal de voz `asistencia-oral` dentro de la categoría del ticket, con acceso para el creador y el Staff correspondiente. No se crean canales duplicados y el canal se elimina al cerrar el ticket.
 
+### Valoración y desempeño
+
+Cuando un Staff asignado utiliza `/tickets valorar`, el sistema crea una solicitud de valoración para el autor del ticket. El autor puede puntuar la atención de 1 a 5 y dejar un justificativo de 5 a 2000 caracteres.
+
+`/tickets historial` muestra tickets reclamados, tickets resueltos, cantidad de valoraciones, promedio, distribución de puntuaciones, valoraciones recientes y un puntaje de desempeño de referencia sobre 100.
+
+El puntaje es un indicador de evaluación y no realiza ascensos automáticos.
+
 ### Formularios
 
 - **Soporte:** asunto, problema, detalles y evidencia opcional.
@@ -230,7 +268,7 @@ Cada ticket dispone de un botón **Asistencia Oral** para el Staff autorizado. A
 - **Alianza / Partner:** tipo, servidor/comunidad, propuesta, miembros y contacto.
 - **Contacto:** asunto, motivo, detalles y evidencia opcional.
 - **Bugs / Errores:** asunto, descripción, pasos para reproducir y evidencia opcional.
-- **Boost:** asunto, cantidad de Boosts, detalles y evidencia.
+- **Boost:** asunto, cantidad de Boosts, detalles y evidencia opcional.
 
 Los valores de interfaz se normalizan antes de guardarse en Supabase. La base de datos acepta actualmente `support`, `report`, `alliance_partner`, `contact`, `bugs` y `boost`.
 
@@ -246,7 +284,7 @@ La participación de miembros se registra por evento en Supabase:
 - La base de datos evita registros duplicados por evento y usuario.
 - `/comienza tipo:Evento` continúa utilizando el rol configurado de participantes para los avisos generales de inicio.
 
-Las participaciones utilizan el ID de Discord como referencia operativa y los datos internos permanecen protegidos mediante RLS y acceso `service_role`.
+Las participaciones utilizan el ID de Discord como referencia operativa y los datos internos permanecen protegidos mediante RLS y acceso de servidor.
 
 ## Monitorización y administración
 
@@ -255,21 +293,22 @@ Las participaciones utilizan el ID de Discord como referencia operativa y los da
 - `/reportes` gestiona reportes internos de usuarios.
 - `/encuesta` permite crear y cerrar encuestas con interacción mediante botones.
 - `/anuncio-programado` permite programar comunicaciones futuras; un worker interno revisa y publica las pendientes.
+- `/prefijo` consulta y modifica el prefijo por servidor.
 
 ## Módulos
 
 - **Información:** help, reglas, links e información general.
 - **Moderación:** warn, warnings, unwarn, timeout, clear, slowmode, kick y ban.
-- **Tickets:** panel, formularios, creación, claim, cierre, adición, retirada y asistencia oral.
-- **Anuncios:** publicaciones oficiales con embed negro e imagen configurable.
+- **Tickets:** panel, formularios, creación, claim, cierre, valoración, historial, adición, retirada y asistencia oral.
+- **Anuncios:** publicaciones oficiales con embed e imagen configurable.
 - **Anuncios programados:** programación y publicación automática de comunicaciones.
 - **Eventos:** creación, edición, ciclo de vida y participación de miembros.
-- **Series:** comunicación y comienzo mediante el sistema de actividades configurado.
+- **Series:** gestión y participación de actividades configuradas.
 - **Premios:** sorteos, participación, finalización, reroll y registro de entrega.
 - **Proyectos:** creación, edición, estado, cierre y asignación de manager.
 - **Postulaciones:** apertura, cierre, resultados, requisitos, FAQ y documentación del proceso.
 - **Autoroles:** asignación automática de Trainee en Staff Team y Applicant en Staff Applications.
-- **Administración:** configuración, canales, roles, permisos, mantenimiento y recarga.
+- **Administración:** configuración, canales, roles, permisos, mantenimiento, auditoría y recarga.
 - **Logs:** un canal de logs por servidor y persistencia en Supabase.
 
 ## Ayuda
@@ -285,7 +324,7 @@ La disponibilidad de las funciones se filtra mediante los IDs de roles configura
 
 ## Registro de comandos Slash
 
-Los comandos `/` se registran mediante **Discord REST API v10** usando `discord.js`. El registro utiliza las rutas de comandos por guild de Discord y no depende del Gateway. discord.js expone específicamente la ruta `applicationGuildCommands(applicationId, guildId)` para registrar comandos de una guild. citeturn0search0turn0search2
+Los comandos `/` se registran mediante **Discord REST API v10** usando `discord.js`. El registro utiliza las rutas de comandos por guild de Discord y no depende del Gateway.
 
 El proyecto dispone de:
 
@@ -294,16 +333,17 @@ npm run deploy
 npm run verify:discord
 ```
 
-El workflow de GitHub Actions instala las dependencias, valida las definiciones, registra los comandos y finalmente comprueba que las guilds tengan exactamente los comandos esperados.
+El workflow de GitHub Actions instala las dependencias, valida las definiciones, comprueba Supabase, registra los comandos y finalmente verifica que las guilds tengan los comandos esperados.
 
 ## Configuración
 
 1. Copia `.env.example` a `.env`.
 2. Completa las credenciales, IDs de servidores, roles y canales necesarios.
 3. Para los autoroles, configura `STAFF_ROLE_TRAINEE_ID` y `APPLICATIONS_ROLE_APPLICANT_ID`.
-4. Ejecuta `npm install`.
-5. Registra los comandos con `npm run deploy` cuando corresponda.
-6. Inicia el bot con `npm start`.
+4. Configura los enlaces de `/links` mediante las variables `OFFICIAL_*_URL` y el correo mediante `OFFICIAL_CONTACT_EMAIL`.
+5. Ejecuta `npm install`.
+6. Registra los comandos con `npm run deploy` cuando corresponda.
+7. Inicia el bot con `npm start`.
 
 En Wispbyte, las variables de entorno se mantienen en la configuración del servicio y **no deben reemplazarse por un `.env` del repositorio**. Después de actualizar el código, reinicia el servicio para aplicar la nueva versión usando las variables que ya están configuradas allí.
 
@@ -339,6 +379,21 @@ OFFICIAL_CHANNEL_SERIES_ID=
 OFFICIAL_CHANNEL_EVENTS_ID=
 ```
 
+### Enlaces oficiales y contacto
+
+```env
+OFFICIAL_DISCORD_URL=
+WEBSITE_URL=
+YOUTUBE_URL=
+TIKTOK_URL=
+INSTAGRAM_URL=
+OFFICIAL_PAYPAL_URL=
+OFFICIAL_KOFI_URL=
+OFFICIAL_CONTACT_EMAIL=
+```
+
+Todos son opcionales. `/links` solo muestra los que estén configurados.
+
 ### Staff Team Discord
 
 El autorole de incorporación utiliza:
@@ -361,27 +416,41 @@ Staff Team y Staff Applications mantienen sus propios IDs de roles y canales por
 
 ## Base de datos y migraciones
 
-Las migraciones se encuentran en `database/migrations/`.
+Las migraciones del proyecto se encuentran en `database/migrations/`. La base de datos de producción usa Supabase y actualmente contiene las migraciones siguientes:
 
-- `20260901000000_initial_hypnox_bot_schema.sql`: esquema inicial.
-- `002_projects.sql`: tablas de proyectos y tareas.
-- `003_remove_old_application_flow.sql`: elimina el flujo antiguo de postulaciones y entrevistas.
-- `004_add_dev_guild_type.sql`: habilita el tipo de servidor de desarrollo/pruebas.
-- `20260902040000_harden_logs_and_rls_auto_enable.sql`: corrige categorías de logs, refuerza RLS en proyectos y tareas y restringe la ejecución pública de `rls_auto_enable()`.
-- `20260902050000_add_bugs_ticket_type.sql`: añade `bugs` como tipo válido de ticket.
-- `20260903031735_remove_dashboard_access.sql`: limpia restos de una capa de autorización web que ya no forma parte del proyecto.
-- `20260903115841_add_missing_foreign_key_indexes.sql`: añade índices para claves foráneas relevantes.
-- `20260903120100_protect_ticket_assignment_race.sql`: protege la asignación concurrente de tickets.
-- `20260903120927_harden_ticket_assignment_function_search_path.sql`: endurece la función de asignación de tickets.
-- `20260903141941_enforce_one_open_ticket_per_user.sql`: limita a un ticket abierto por usuario.
-- `20260903222000_add_ticket_oral_voice_channel.sql`: añade el canal de voz de asistencia oral por ticket.
-- `20260903235113_revoke_public_trigger_function_execute.sql`: revoca ejecución pública de la función interna correspondiente.
-- `20260904010334_reports_polls_scheduled_announcements.sql`: añade reportes, encuestas y anuncios programados.
-- `20260904010829_add_event_participants.sql`: añade el registro de participantes por evento.
+```text
+20260902001129 initial_hypnox_bot_schema
+20260902003906 003_remove_old_application_flow
+20260902035150 harden_logs_and_rls_auto_enable
+20260902134043 add_bugs_ticket_type
+20260902172603 dashboard_access
+20260903031735 remove_dashboard_access
+20260903115841 add_missing_foreign_key_indexes
+20260903120100 protect_ticket_assignment_race
+20260903120927 harden_ticket_assignment_function_search_path
+20260903141941 enforce_one_open_ticket_per_user
+20260903235113 revoke_public_trigger_function_execute
+20260904010334 reports_polls_scheduled_announcements
+20260904010829 add_event_participants
+20260904021511 add_series_participants
+20260904145643 fix_scheduled_announcements_processing
+20260905200453 add_guild_prefix
+20260905201837 add_guild_server_ip
+20260905211754 add_ticket_oral_voice_channel
+20260905215640 add_boost_ticket_type
+20260906041542 add_oral_assistance_event_type
+20260906051951 add_ticket_staff_ratings_history
+20260906052040 allow_pending_ticket_ratings
+20260906072503 fix_ticket_rating_pending_timestamp
+```
 
-Las migraciones históricas ya aplicadas no deben ejecutarse nuevamente de forma ciega sobre una base existente. Primero debe comprobarse el estado real de la base de datos.
+Algunas migraciones históricas de producción tienen un número de versión distinto al nombre del archivo equivalente que permanece en el repositorio. Esto es un histórico de migraciones aplicado durante el desarrollo, no una diferencia funcional del esquema. No se deben ejecutar nuevamente migraciones históricas de producción de forma ciega.
 
-El bot utiliza `SUPABASE_SERVICE_ROLE_KEY` exclusivamente desde el backend. Esta credencial nunca debe exponerse en el cliente ni publicarse en GitHub.
+`npm run verify:supabase` comprueba las cuatro guilds configuradas, que estén habilitadas, sus prefijos, `tickets`, `ticket_events` y `ticket_ratings`.
+
+La integridad actual del sistema de tickets se mantiene mediante claves foráneas, restricción de un ticket abierto por usuario y protección contra carreras en asignación.
+
+El bot utiliza claves secretas de Supabase exclusivamente desde el backend. Nunca deben exponerse en el cliente ni publicarse en GitHub.
 
 ## Dependencias
 
@@ -396,11 +465,13 @@ Las versiones principales están fijadas en `package.json`:
 
 - Nunca subas `.env` a GitHub.
 - Nunca publiques `DISCORD_TOKEN`.
-- Nunca publiques `SUPABASE_SERVICE_ROLE_KEY`.
-- Mantén RLS habilitado en las tablas expuestas de Supabase.
+- Nunca publiques las claves secretas de Supabase.
+- Mantén RLS habilitado en las tablas de Supabase.
 - Los permisos del bot deben configurarse mediante IDs y no mediante nombres de roles.
 - El rol máximo del bot debe estar por encima de los roles de autorole que necesita asignar.
 - Antes de aplicar una migración sobre producción, verifica el estado actual de la base de datos.
+
+Los avisos actuales del asesor de Supabase son de nivel informativo: RLS está habilitado sin políticas públicas en las tablas protegidas y existen índices marcados como no utilizados. No se agregaron políticas públicas porque el bot trabaja con acceso de servidor y una política permisiva expondría datos internos.
 
 ## Repositorio
 
