@@ -151,7 +151,7 @@ function commandDifferences(expected, registered) {
 
 function expectedForGuild(commands, guildType) {
   return commands
-    .filter((command) => guildType === 'dev' || command.guilds.includes(guildType))
+    .filter((command) => command.guilds.includes(guildType))
     .map((command) => normalize(command.data.toJSON()));
 }
 
