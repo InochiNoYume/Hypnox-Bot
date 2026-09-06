@@ -10,6 +10,7 @@ const required = [
 ];
 
 const DISCORD_ID_PATTERN = /^\d{17,20}$/;
+const BOT_ID_PREFIXES = ['DISCORD_', 'OFFICIAL_', 'STAFF_', 'APPLICATIONS_', 'DEV_'];
 
 function getEnv(key, fallback = undefined) {
   const value = process.env[key];
@@ -40,6 +41,7 @@ function getSupabaseKey() {
 function getDiscordIdKeys() {
   return Object.keys(process.env)
     .filter((key) => key.endsWith('_ID'))
+    .filter((key) => BOT_ID_PREFIXES.some((prefix) => key.startsWith(prefix)))
     .filter((key) => !key.startsWith('SUPABASE_'));
 }
 
