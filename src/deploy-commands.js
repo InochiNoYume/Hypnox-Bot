@@ -139,8 +139,8 @@ function commandDifferences(expected, registered) {
       differences.push(`${name}: solo existe en el código`);
       continue;
     }
-    const expectedJson = JSON.stringify(expectedMap.get(name), null, 2);
-    const registeredJson = JSON.stringify(registeredMap.get(name), null, 2);
+    const expectedJson = JSON.stringify(expectedMap.get(name));
+    const registeredJson = JSON.stringify(registeredMap.get(name));
     if (expectedJson !== registeredJson) {
       differences.push(`${name}: definición distinta`);
     }
@@ -152,7 +152,7 @@ function commandDifferences(expected, registered) {
 function expectedForGuild(commands, guildType) {
   return commands
     .filter((command) => guildType === 'dev' || command.guilds.includes(guildType))
-    .map((command) => command.data.toJSON());
+    .map((command) => normalize(command.data.toJSON()));
 }
 
 function validateDeployEnv() {
