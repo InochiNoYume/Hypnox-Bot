@@ -15,6 +15,7 @@ const MANAGEMENT_ROLES = [
 ];
 
 const EMBED_COLOR = 0x2B2D31;
+const EPHEMERAL = MessageFlags.Ephemeral;
 
 const data = new SlashCommandBuilder()
   .setName('ip')
@@ -49,56 +50,46 @@ function createIpEmbed(ip, guild) {
 }
 
 async function execute(interaction) {
-  const subcommand = interaction.options.getSubcommand();
-  const isManagement = MANAGEMENT_ROLES.some((roleEnv) => hasConfiguredRole(interaction.member, roleEnv));
+  await interaction.deferReply({ flags: EPHEMERAL });
 
   try {
+    const subcommand = interaction.options.getSubcommand();
+    const isManagement = MANAGEMENT_ROLES.some((roleEnv) => hasConfiguredRole(interaction.member, roleEnv));
+
     if (subcommand === 'ver') {
       const ip = await getGuildIp(interaction.guild.id);
       if (!ip) {
-        return interaction.reply({
-          content: 'La dirección del servidor todavía no ha sido configurada.',
-          flags: MessageFlags.Ephemeral
-        });
+        return interaction.editReply({ content: 'La dirección del servidor todavía no ha sido configurada.' });
       }
 
-      return interaction.reply({ embeds: [createIpEmbed(ip, interaction.guild)] });
+      return interaction.editReply({ embeds: [createIpEmbed(ip, interaction.guild)] });
     }
 
     if (!isManagement) {
-      return interaction.reply({
-        content: 'No tienes permisos para configurar la dirección del servidor.',
-        flags: MessageFlags.Ephemeral
-      });
+      return interaction.editReply({ content: 'No tienes permisos para configurar la dirección del servidor.' });
     }
 
     if (subcommand === 'eliminar') {
       await clearGuildIp(interaction.guild.id);
-      return interaction.reply({
-        content: 'La dirección del servidor fue eliminada correctamente.',
-        flags: MessageFlags.Ephemeral
-      });
+      return interaction.editReply({ content: 'La dirección del servidor fue eliminada correctamente.' });
+    }
+
+    if (subcommand !== 'establecer') {
+      return interaction.editReply({ content: 'Subcomando no válido.' });
     }
 
     const newIp = interaction.options.getString('ip', true).trim();
     const oldIp = await getGuildIp(interaction.guild.id);
     const updatedIp = await setGuildIp(interaction.guild.id, newIp);
 
-    return interaction.reply({
+    return interaction.editReply({
       content: oldIp && oldIp !== updatedIp
         ? `La dirección del servidor fue actualizada. La dirección anterior \`${oldIp}\` fue reemplazada por \`${updatedIp}\`.`
-        : `La dirección del servidor quedó configurada como \`${updatedIp}\`.`,
-      flags: MessageFlags.Ephemeral
+        : `La dirección del servidor quedó configurada como \`${updatedIp}\`.`
     });
   } catch (error) {
     console.error('[HYPNOX][IP] Error:', error);
-    if (interaction.replied || interaction.deferred) {
-      return interaction.editReply({ content: 'No se pudo completar la configuración de la dirección del servidor.' });
-    }
-    return interaction.reply({
-      content: 'No se pudo completar la configuración de la dirección del servidor.',
-      flags: MessageFlags.Ephemeral
-    });
+    return interaction.editReply({ content: 'No se pudo completar la configuración de la dirección del servidor.' }).catch(() => {});
   }
 }
 
