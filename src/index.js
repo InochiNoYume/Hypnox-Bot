@@ -254,15 +254,16 @@ async function syncGuildsToSupabase(client) {
 async function handleClientReady(client) {
   console.log(`[HYPNOX][READY] CONECTADO COMO ${client.user.tag} (${client.user.id})`);
 
-  const syncOnReady = getEnv('SYNC_COMMANDS_ON_READY', 'false').toLowerCase() === 'true';
+  const syncOnReady = getEnv('SYNC_COMMANDS_ON_READY', 'true').toLowerCase() === 'true';
   if (syncOnReady) {
     try {
-      await registerSlashCommands(client);
+      const result = await registerSlashCommands(client);
+      if (result.failures.length) console.error(`[HYPNOX][COMMANDS] Sincronización al iniciar terminó con errores: ${result.failures.join(', ')}.`);
     } catch (error) {
       console.error('[HYPNOX][COMMANDS] ERROR:', error.message);
     }
   } else {
-    console.log('[HYPNOX][COMMANDS] Sincronización automática omitida; el Gateway no depende de REST.');
+    console.log('[HYPNOX][COMMANDS] Sincronización automática desactivada por SYNC_COMMANDS_ON_READY=false.');
   }
 
   try { await syncGuildsToSupabase(client); }
@@ -361,32 +362,11 @@ async function bootstrap() {
     handleClientReady(client).catch((error) => console.error('[HYPNOX][READY] Error inesperado:', error));
   });
 
-  process.on('unhandledRejection', (error) => console.error('[HYPNOX][PROCESS] Unhandled rejection:', error));
-  process.on('uncaughtException', (error) => {
-    console.error('[HYPNOX][PROCESS] Uncaught exception:', error);
-    process.exitCode = 1;
-  });
-
   await verifyDiscordToken();
   await loginWithDiagnostics(client);
 }
 
-if (require.main === module) {
-  bootstrap().catch((error) => {
-    console.error('[HYPNOX] Error iniciando el bot:', error);
-    process.exit(1);
-  });
-}
-
-module.exports = {
-  bootstrap,
-  registerSlashCommands,
-  registerAutoRoles,
-  registerConnectionDiagnostics,
-  verifyDiscordToken,
-  loginWithDiagnostics,
-  verifySupabaseConnection,
-  syncGuildsToSupabase,
-  checkDiscordGatewayHttp,
-  waitForClientReady
-};
+bootstrap().catch((error) => {
+  console.error('[HYPNOX] Error fatal durante el arranque:', error);
+  process.exit(1);
+});
