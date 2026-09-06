@@ -36,8 +36,9 @@ function shuffle(values) {
 }
 
 async function execute(interaction) {
+  await interaction.deferReply({ flags: EPHEMERAL });
   const guild = await getGuildRow(interaction.guild.id);
-  if (!guild) return interaction.reply({ content: 'Servidor no registrado.', flags: EPHEMERAL });
+  if (!guild) return interaction.editReply({ content: 'Servidor no registrado.' });
   const sub = interaction.options.getSubcommand();
 
   try {
@@ -65,28 +66,28 @@ async function execute(interaction) {
       const { error: messageError } = await supabase.from('giveaways').update({ message_id: message.id }).eq('id', giveaway.id);
       if (messageError) throw messageError;
       await writeLog({ guild: interaction.guild, category: 'giveaway', action: 'create', actorId: interaction.user.id, channelId: interaction.channel.id, message: giveaway.title, metadata: { giveawayId: giveaway.id } });
-      return interaction.reply({ content: `Sorteo creado: \`${giveaway.id}\``, flags: EPHEMERAL });
+      return interaction.editReply({ content: `Sorteo creado: \`${giveaway.id}\`` });
     }
 
     if (sub === 'entregar') {
       const user = interaction.options.getUser('usuario');
       const detail = interaction.options.getString('detalle').trim();
       await writeLog({ guild: interaction.guild, category: 'giveaway', action: 'deliver', actorId: interaction.user.id, targetId: user.id, message: detail });
-      return interaction.reply({ content: 'Entrega registrada correctamente en los registros.', flags: EPHEMERAL });
+      return interaction.editReply({ content: 'Entrega registrada correctamente en los registros.' });
     }
 
     const id = interaction.options.getString('id');
     const { data: giveaway, error } = await supabase.from('giveaways').select('*').eq('id', id).eq('guild_id', guild.id).maybeSingle();
     if (error) throw error;
-    if (!giveaway) return interaction.reply({ content: 'No se encontró el sorteo indicado.', flags: EPHEMERAL });
+    if (!giveaway) return interaction.editReply({ content: 'No se encontró el sorteo indicado.' });
 
-    if (sub === 'finalizar' && giveaway.status !== 'active') return interaction.reply({ content: 'Este sorteo ya no está activo.', flags: EPHEMERAL });
-    if (sub === 'reroll' && giveaway.status !== 'finished') return interaction.reply({ content: 'El reroll solo puede realizarse después de finalizar el sorteo.', flags: EPHEMERAL });
+    if (sub === 'finalizar' && giveaway.status !== 'active') return interaction.editReply({ content: 'Este sorteo ya no está activo.' });
+    if (sub === 'reroll' && giveaway.status !== 'finished') return interaction.editReply({ content: 'El reroll solo puede realizarse después de finalizar el sorteo.' });
 
     const { data: entries, error: entriesError } = await supabase.from('giveaway_entries').select('user_id').eq('giveaway_id', id);
     if (entriesError) throw entriesError;
     const participants = [...new Set((entries || []).map((entry) => entry.user_id))];
-    if (!participants.length) return interaction.reply({ content: 'No hay participantes para seleccionar.', flags: EPHEMERAL });
+    if (!participants.length) return interaction.editReply({ content: 'No hay participantes para seleccionar.' });
 
     let pool = participants;
     if (sub === 'reroll') {
@@ -96,7 +97,7 @@ async function execute(interaction) {
     }
 
     const winnerIds = shuffle(pool).slice(0, Math.min(giveaway.winner_count, pool.length));
-    if (!winnerIds.length) return interaction.reply({ content: 'No quedan participantes elegibles para el nuevo resultado.', flags: EPHEMERAL });
+    if (!winnerIds.length) return interaction.editReply({ content: 'No quedan participantes elegibles para el nuevo resultado.' });
     const { data: users, error: usersError } = await supabase.from('users').select('id,discord_user_id').in('id', winnerIds);
     if (usersError) throw usersError;
     const mentions = (users || []).map((user) => `◆ <@${user.discord_user_id}>`);
@@ -113,10 +114,10 @@ async function execute(interaction) {
       { name: 'GANADORES', value: mentions.join('\n'), inline: false }
     );
     embed.setFooter({ text: `Hypnox Studios • ${sub === 'reroll' ? 'Nuevo resultado' : 'Sorteo finalizado'}` });
-    return interaction.reply({ embeds: [embed] });
+    return interaction.editReply({ embeds: [embed] });
   } catch (error) {
     console.error('[HYPNOX] Giveaway error:', error);
-    return interaction.reply({ content: 'No se pudo gestionar el sorteo.', flags: EPHEMERAL }).catch(() => {});
+    return interaction.editReply({ content: 'No se pudo gestionar el sorteo.' }).catch(() => {});
   }
 }
 
