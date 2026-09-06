@@ -109,8 +109,22 @@ function normalize(value, key = null) {
   return normalizePrimitive(value, key);
 }
 
+function canonicalizeCommand(command) {
+  const normalized = normalize(command);
+  if (!normalized || typeof normalized !== 'object') return normalized;
+
+  // Discord may materialize omitted builder defaults in GET responses.
+  // Treat these equivalent to their omitted form so verification does not
+  // report every command as different after a successful registration.
+  if (normalized.default_member_permissions === null) delete normalized.default_member_permissions;
+  if (normalized.dm_permission === true) delete normalized.dm_permission;
+  if (normalized.nsfw === false) delete normalized.nsfw;
+
+  return normalized;
+}
+
 function commandMap(commands) {
-  return new Map((commands || []).map((command) => [command.name, normalize(command)]));
+  return new Map((commands || []).map((command) => [command.name, canonicalizeCommand(command)]));
 }
 
 function commandsEqual(expected, registered) {
