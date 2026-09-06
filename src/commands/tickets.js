@@ -87,6 +87,7 @@ function buildHistoryEmbed(member, history) {
   const embed = brandedEmbed('HISTORIAL DE STAFF', 'Registro de desempeño basado en tickets reclamados, tickets resueltos y valoraciones de usuarios.');
   embed.addFields(
     { name: '◆ STAFF', value: `<@${member.id}>`, inline: false },
+    { name: '◆ PUNTAJE DE DESEMPEÑO', value: `**${history.score}/100**\n${history.performanceLevel}`, inline: false },
     { name: '◆ TICKETS RECLAMADOS', value: String(history.claimed), inline: true },
     { name: '◆ TICKETS RESUELTOS', value: String(history.resolved), inline: true },
     { name: '◆ VALORACIONES', value: String(history.ratings), inline: true },
@@ -162,7 +163,7 @@ async function execute(i) {
       if (ticket.assigned_to_discord_user_id !== i.user.id) return i.editReply({ content: 'Solo el Staff que reclamó este ticket puede solicitar su valoración.' });
       const creatorDiscordId = await getTicketCreatorDiscordId(ticket);
       if (!creatorDiscordId) return i.editReply({ content: 'No se pudo identificar al autor del ticket.' });
-      const result = await requestTicketRating(ticket.id, i.user.id);
+      await requestTicketRating(ticket.id, i.user.id);
       const embed = brandedEmbed('VALORACIÓN DE ATENCIÓN', `La atención de este ticket fue realizada por **${i.member.displayName || i.user.username}**.\n\nQueremos conocer cómo fue tu experiencia con la información y atención entregadas por el Staff.`);
       embed.addFields({ name: '◆ STAFF QUE ATENDIÓ', value: `<@${i.user.id}>`, inline: true }, { name: '◆ SOLICITANTE', value: `<@${creatorDiscordId}>`, inline: true }, { name: '◆ VALORACIÓN', value: 'Del 1 al 5, indica qué tan buena fue la información y atención recibida.', inline: false });
       embed.setFooter({ text: 'Hypnox Studios • Evaluación de atención' });
@@ -222,4 +223,4 @@ function hideStaffFromTicket(channel, claimedUserId) {
   })).then(() => claimedUserId ? channel.permissionOverwrites.edit(claimedUserId, { ViewChannel: true, SendMessages: true, ReadMessageHistory: true }) : null);
 }
 
-module.exports = { data, execute, select, labels };
+module.exports = { data, execute, select, labels, guilds: ['official'] };
