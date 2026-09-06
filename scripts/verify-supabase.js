@@ -46,7 +46,13 @@ async function verifySupabase() {
     .limit(1);
   if (eventError) throw new Error(`La tabla public.ticket_events no responde correctamente: ${eventError.message}`);
 
-  console.log(`[HYPNOX][SUPABASE] OK — ${EXPECTED_GUILD_TYPES.length} guilds sincronizadas, tickets y ticket_events accesibles.`);
+  const { error: ratingError } = await supabase
+    .from('ticket_ratings')
+    .select('id,ticket_id,guild_id,staff_discord_user_id,rated_by_discord_user_id,rating,justification,requested_at,submitted_at')
+    .limit(1);
+  if (ratingError) throw new Error(`La tabla public.ticket_ratings no responde correctamente: ${ratingError.message}`);
+
+  console.log(`[HYPNOX][SUPABASE] OK — ${EXPECTED_GUILD_TYPES.length} guilds sincronizadas, tickets, ticket_events y ticket_ratings accesibles.`);
   for (const guildType of EXPECTED_GUILD_TYPES) {
     const guild = byType.get(guildType);
     console.log(`[HYPNOX][SUPABASE] ${guildType}: prefix=${guild.prefix} enabled=${guild.enabled ? 'true' : 'false'} ip=${guild.server_ip ? 'configurada' : 'no configurada'}.`);
